@@ -533,4 +533,28 @@ do {
 }
 kc.deleteToken(account: "test") // gdyby zapis przerwał się w połowie
 
+// MARK: - SettingsStore
+
+t.suite("SettingsStore")
+// Osobna domena UserDefaults, żeby nie ruszać ustawień produkcyjnych; czyścimy przed i po.
+let suiteName = "pl.zielinski.vercelbar.testy"
+let defaults = UserDefaults(suiteName: suiteName)!
+defaults.removePersistentDomain(forName: suiteName)
+let settings = SettingsStore(defaults: defaults)
+t.equal(settings.watchedProjectIDs, [], "domyślnie brak obserwowanych")
+t.equal(settings.notifySuccess, true, "sukcesy domyślnie włączone")
+t.equal(settings.notifyFailure, true, "błędy domyślnie włączone")
+t.equal(settings.teamID, nil, "domyślnie konto osobiste")
+
+settings.watchedProjectIDs = ["prj_1", "prj_2"]
+settings.notifySuccess = false
+settings.teamID = "team_9"
+let reloaded = SettingsStore(defaults: defaults)
+t.equal(reloaded.watchedProjectIDs, ["prj_1", "prj_2"], "obserwowane trwają po ponownym wczytaniu")
+t.equal(reloaded.notifySuccess, false, "wyłączenie sukcesów trwa")
+t.equal(reloaded.teamID, "team_9", "team trwa")
+reloaded.teamID = nil
+t.equal(SettingsStore(defaults: defaults).teamID, nil, "powrót do konta osobistego")
+defaults.removePersistentDomain(forName: suiteName)
+
 t.finish()
