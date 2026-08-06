@@ -1570,7 +1570,14 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private var refreshInFlight = false
+
     func refresh() async {
+        // Osłona przed reentrancją: pętla + przycisk Odśwież + didWake mogą się nałożyć,
+        // a starsza migawka podana do ingest po nowszej wystrzeliłaby stare zdarzenia.
+        guard !refreshInFlight else { return }
+        refreshInFlight = true
+        defer { refreshInFlight = false }
         guard let token = keychain.readToken() else { phase = .onboarding; return }
         let api = VercelAPI(token: token, teamID: settings.teamID)
         do {
@@ -2536,6 +2543,7 @@ Po przeglądach jakości Tasków 1–2 wprowadzono zmiany względem kodu wklejon
 7. **`headline` w `.idle`** rozróżnia pustą listę („Brak obserwowanych projektów") od projektów z samymi canceled/unknown („Brak aktywnych deployów"). W Tasku 11 argument budować przez `model.projects.map { $0.latest?.state ?? .unknown }` (NIE `compactMap`) — projekt bez żadnego deployu ma liczyć się jako `unknown`, nie znikać.
 8. **`AppModel` trzyma `@Published var anyActive`** ustawiane z `Snapshot.anyActive`; pętla odpytywania używa go zamiast `overall == .building` (error jednego projektu nie może maskować trwającego builda innego). Snippet Taska 10 wyżej już poprawiony.
 9. **Backoff 429/5xx**: przy implementacji Taska 10 wydziel czystą funkcję do `PollScheduler` (np. `delay(base:consecutiveFailures:)` → base przy 0, potem min(300, 30·2^n)) i pokryj testami; `AppModel` tylko ją woła.
+10. **`refresh()` ma osłonę przed reentrancją** (`refreshInFlight`) — pętla, przycisk Odśwież i didWake mogą się nałożyć; snippet Taska 10 wyżej już poprawiony. `NotificationEngine.ingest` przycina `lastSeen` do projektów bieżącej migawki (reset baseline po odznaczeniu projektu).
 
 ---
 
