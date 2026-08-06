@@ -202,4 +202,28 @@ t.suite("PollScheduler")
 t.equal(PollScheduler.interval(anyActive: false), 30, "spokój → 30 s")
 t.equal(PollScheduler.interval(anyActive: true), 10, "build w toku → 10 s")
 
+// MARK: - Formatowanie czasu
+
+t.suite("Format.relative")
+let now = Date(timeIntervalSince1970: 1_754_470_000)
+func ago(_ s: TimeInterval) -> Date { now.addingTimeInterval(-s) }
+t.equal(Format.relative(ago(10), now: now), "teraz", "poniżej 45 s → teraz")
+t.equal(Format.relative(ago(50), now: now), "50 s temu", "sekundy")
+t.equal(Format.relative(ago(120), now: now), "2 min temu", "minuty")
+t.equal(Format.relative(ago(3600), now: now), "1 godz. temu", "godziny")
+t.equal(Format.relative(ago(5 * 3600), now: now), "5 godz. temu", "kilka godzin")
+t.equal(Format.relative(ago(30 * 3600), now: now), "wczoraj", "24–48 h → wczoraj")
+t.equal(Format.relative(ago(3 * 86_400), now: now), "3 dni temu", "dni")
+
+t.suite("Format.duration")
+t.equal(Format.duration(38), "38 s", "sekundy")
+t.equal(Format.duration(126), "2 min 06 s", "minuty z zerem wiodącym sekund")
+t.equal(Format.duration(60), "1 min 00 s", "równa minuta")
+
+t.suite("Format.clock")
+var cal = Calendar(identifier: .gregorian)
+cal.timeZone = TimeZone(identifier: "Europe/Warsaw")!
+let noon = cal.date(from: DateComponents(year: 2026, month: 8, day: 6, hour: 12, minute: 4))!
+t.equal(Format.clock(noon, timeZone: cal.timeZone), "12:04", "zegar HH:mm")
+
 t.finish()
