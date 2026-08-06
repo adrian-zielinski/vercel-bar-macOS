@@ -368,4 +368,78 @@ _ = e15.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", s
 let okTwice = e15.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
 t.equal(okTwice, [], "ten sam sukces nie wraca po regresie stanu z API")
 
+// MARK: - Klient VercelAPI
+
+final class StubSession: HTTPSession, @unchecked Sendable {
+    var responses: [String: (Int, Data)] = [:] // fragment URL → (status, body)
+    var lastRequest: URLRequest?
+    var thrownError: Error?
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        lastRequest = request
+        if let thrownError { throw thrownError }
+        let url = request.url!.absoluteString
+        for (fragment, (status, body)) in responses where url.contains(fragment) {
+            let resp = HTTPURLResponse(url: request.url!, statusCode: status,
+                                       httpVersion: nil, headerFields: nil)!
+            return (body, resp)
+        }
+        fatalError("brak stubu dla \(url)")
+    }
+}
+
+t.suite("VercelAPI — nagłówki i parametry")
+let stub = StubSession()
+stub.responses["/v2/user"] = (200, Data(#"{"user":{"uid":"u1","username":"marta","name":null}}"#.utf8))
+let api = VercelAPI(token: "tok_123", teamID: "team_9", session: stub)
+let user = try await api.user()
+t.equal(user.username, "marta", "user dekoduje się")
+t.equal(stub.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer tok_123", "nagłówek Bearer")
+t.check(stub.lastRequest?.url?.query?.contains("teamId=team_9") == true, "teamId w query")
+
+t.suite("VercelAPI — latestDeployment")
+stub.responses["/v6/deployments"] = (200, Data("""
+{"deployments":[{"uid":"d9","state":"READY","createdAt":1754470000000,
+ "buildingAt":1754470002000,"ready":1754470040000,"meta":{}}]}
+""".utf8))
+let latest = try await api.latestDeployment(projectID: "prj_1")
+t.equal(latest?.id, "d9", "najnowszy deploy z /v6/deployments")
+t.check(stub.lastRequest?.url?.query?.contains("projectId=prj_1") == true, "projectId w query")
+t.check(stub.lastRequest?.url?.query?.contains("limit=1") == true, "limit=1 w query")
+
+t.suite("VercelAPI — mapowanie błędów")
+let stubErr = StubSession()
+stubErr.responses["/v2/user"] = (401, Data("{}".utf8))
+do {
+    _ = try await VercelAPI(token: "zły", session: stubErr).user()
+    t.check(false, "401 powinien rzucić")
+} catch let e as VercelAPIError {
+    t.equal(e, .unauthorized, "401 → unauthorized")
+} catch { t.check(false, "zły typ błędu: \(error)") }
+
+stubErr.responses["/v2/user"] = (429, Data("{}".utf8))
+do {
+    _ = try await VercelAPI(token: "t", session: stubErr).user()
+    t.check(false, "429 powinien rzucić")
+} catch let e as VercelAPIError {
+    t.equal(e, .rateLimited, "429 → rateLimited")
+} catch { t.check(false, "zły typ błędu: \(error)") }
+
+stubErr.responses["/v2/user"] = (500, Data("{}".utf8))
+do {
+    _ = try await VercelAPI(token: "t", session: stubErr).user()
+    t.check(false, "500 powinien rzucić")
+} catch let e as VercelAPIError {
+    t.equal(e, .server(500), "500 → server(500)")
+} catch { t.check(false, "zły typ błędu: \(error)") }
+
+let stubOffline = StubSession()
+stubOffline.thrownError = URLError(.notConnectedToInternet)
+do {
+    _ = try await VercelAPI(token: "t", session: stubOffline).user()
+    t.check(false, "URLError powinien rzucić")
+} catch let e as VercelAPIError {
+    t.equal(e, .offline, "URLError → offline")
+} catch { t.check(false, "zły typ błędu: \(error)") }
+
 t.finish()
