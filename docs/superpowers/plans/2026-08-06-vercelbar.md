@@ -1607,6 +1607,8 @@ final class AppModel: ObservableObject {
         } catch VercelAPIError.offline {
             phase = .offline
             updatePulse(active: false)
+        } catch is CancellationError {
+            // Anulowany polling (restart pętli) — nie zmieniaj stanu.
         } catch {
             // 429/5xx: zostaw poprzednie dane; pętla ponowi z backoffem.
             consecutiveFailures += 1
@@ -2544,6 +2546,7 @@ Po przeglądach jakości Tasków 1–2 wprowadzono zmiany względem kodu wklejon
 8. **`AppModel` trzyma `@Published var anyActive`** ustawiane z `Snapshot.anyActive`; pętla odpytywania używa go zamiast `overall == .building` (error jednego projektu nie może maskować trwającego builda innego). Snippet Taska 10 wyżej już poprawiony.
 9. **Backoff 429/5xx**: przy implementacji Taska 10 wydziel czystą funkcję do `PollScheduler` (np. `delay(base:consecutiveFailures:)` → base przy 0, potem min(300, 30·2^n)) i pokryj testami; `AppModel` tylko ją woła.
 10. **`refresh()` ma osłonę przed reentrancją** (`refreshInFlight`) — pętla, przycisk Odśwież i didWake mogą się nałożyć; snippet Taska 10 wyżej już poprawiony. `NotificationEngine.ingest` przycina `lastSeen` do projektów bieżącej migawki (reset baseline po odznaczeniu projektu).
+11. **`VercelAPI.get`**: anulowanie (`CancellationError`, `URLError(.cancelled)`) rzuca `CancellationError`, NIE `.offline`; `refresh()` łapie je osobno i nie zmienia stanu (snippet wyżej poprawiony). Timeout requestu 15 s. Świadome odroczenia po v1: mapowanie `DecodingError` na własny case, paginacja `/v9/projects` powyżej 100 projektów, rozróżnienie 403 od 401.
 
 ---
 
