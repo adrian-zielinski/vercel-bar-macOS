@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Security
 import VercelBarKit
@@ -558,5 +559,15 @@ t.equal(reloaded.teamID, "team_9", "team trwa")
 reloaded.teamID = nil
 t.equal(SettingsStore(defaults: defaults).teamID, nil, "powrót do konta osobistego")
 defaults.removePersistentDomain(forName: suiteName)
+
+// MARK: - Ikona paska menu
+
+t.suite("StatusIconRenderer")
+t.equal(StatusIconRenderer.pulseAlpha(phase: 0), 0.55, "puls w fazie 0 → 0,55")
+t.equal(StatusIconRenderer.pulseAlpha(phase: 0.5), 1.0, "puls w fazie 0,5 → 1,0")
+t.check(abs(StatusIconRenderer.pulseAlpha(phase: 1.0) - 0.55) < 0.0001, "puls w fazie 1,0 wraca do 0,55")
+let icon = StatusIconRenderer.image(state: .ready)
+t.equal(icon.size, NSSize(width: 15, height: 13), "rozmiar ikony 15×13 pt (design)")
+t.check(!icon.isTemplate, "ikona kolorowa, nie szablonowa")
 
 t.finish()
