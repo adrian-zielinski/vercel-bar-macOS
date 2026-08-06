@@ -1785,7 +1785,8 @@ struct ProjectRowView: View {
         .background(rowBackground)
         .overlay( // rozbłysk Building → Ready
             RoundedRectangle(cornerRadius: 7)
-                .fill(Color(nsColor: Theme.ready).opacity(flash ? 0.16 : 0))
+                .fill(Color(nsColor: Theme.successFlash))
+                .opacity(flash ? 1 : 0)
         )
         .clipShape(RoundedRectangle(cornerRadius: 7))
         .padding(.horizontal, 5)
@@ -1866,12 +1867,12 @@ struct ProjectRowView: View {
     private var rowBackground: some View {
         RoundedRectangle(cornerRadius: 7)
             .fill(isError
-                  ? Color(nsColor: Theme.error).opacity(hovered ? 0.085 : 0.055)
+                  ? Color(nsColor: hovered ? Theme.rowErrorHoverBg : Theme.rowErrorBg)
                   : Color.primary.opacity(hovered ? 0.045 : 0))
             .overlay {
                 if isError {
                     RoundedRectangle(cornerRadius: 7)
-                        .strokeBorder(Color(nsColor: Theme.error).opacity(0.20), lineWidth: 0.5)
+                        .strokeBorder(Color(nsColor: Theme.rowErrorRing), lineWidth: 0.5)
                 }
             }
     }
