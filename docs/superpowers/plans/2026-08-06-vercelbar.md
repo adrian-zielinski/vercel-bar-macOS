@@ -1515,6 +1515,7 @@ final class AppModel: ObservableObject {
     @Published var projects: [Project] = []
     @Published var allProjects: [Project] = []   // do listy w Ustawieniach
     @Published var overall: AggregateState = .idle
+    @Published var anyActive = false // z migawki; overall == .error może maskować trwający build
     @Published var lastRefreshed: Date?
     @Published var iconAlpha: Double = 1
     @Published var account: VercelUser?
@@ -1559,7 +1560,7 @@ final class AppModel: ObservableObject {
             while !Task.isCancelled {
                 await self?.refresh()
                 guard let self else { return }
-                let base = PollScheduler.interval(anyActive: self.overall == .building)
+                let base = PollScheduler.interval(anyActive: self.anyActive)
                 // Wykładniczy backoff po 429/5xx: 60 s, 120 s, 240 s… maks. 300 s.
                 let delay = self.consecutiveFailures > 0
                     ? min(300, 30 * pow(2, Double(self.consecutiveFailures)))
@@ -1578,6 +1579,7 @@ final class AppModel: ObservableObject {
             withAnimation(reduceMotion ? nil : .spring(duration: 0.22)) {
                 projects = snapshot.projects
                 overall = snapshot.overall
+                anyActive = snapshot.anyActive
                 phase = .normal
             }
             lastRefreshed = Date()
@@ -2531,6 +2533,9 @@ Po przeglądach jakości Tasków 1–2 wprowadzono zmiany względem kodu wklejon
 4. **`APIDecoding`**: `meta` dekodowane odpornie (`LossyStringDict` — nie-stringi pomijane); `previewURL` dokleja `https://` tylko gdy brak schematu.
 5. **Runner testów** ma dodatkowo `skip()`, zbiorczą sekcję „Niezaliczone:" i format porażki `[oczekiwano: X, jest: Y]`.
 6. **Architektura zapytań bez zmian** (N+1: `/v9/projects` + `/v6/deployments?projectId=`) — świadoma decyzja: gwarantowany `inspectorUrl`, limity API z zapasem. Ewentualna optymalizacja przez `latestDeployments` z `/v9/projects` to osobny task po v1.
+7. **`headline` w `.idle`** rozróżnia pustą listę („Brak obserwowanych projektów") od projektów z samymi canceled/unknown („Brak aktywnych deployów").
+8. **`AppModel` trzyma `@Published var anyActive`** ustawiane z `Snapshot.anyActive`; pętla odpytywania używa go zamiast `overall == .building` (error jednego projektu nie może maskować trwającego builda innego). Snippet Taska 10 wyżej już poprawiony.
+9. **Backoff 429/5xx**: przy implementacji Taska 10 wydziel czystą funkcję do `PollScheduler` (np. `delay(base:consecutiveFailures:)` → base przy 0, potem min(300, 30·2^n)) i pokryj testami; `AppModel` tylko ją woła.
 
 ---
 
