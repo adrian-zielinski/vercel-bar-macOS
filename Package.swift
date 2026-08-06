@@ -10,7 +10,7 @@ let package = Package(
         .executable(name: "vercelbar-tests", targets: ["vercelbar-tests"]),
     ],
     targets: [
-        // Rdzeń: modele, klient API, logika stanów i powiadomień. Bez UI.
+        // Rdzeń: modele, klient API, logika stanów i powiadomień. AppKit tylko dla kolorów i ikony — bez widoków.
         .target(name: "VercelBarKit", swiftSettings: [.swiftLanguageMode(.v5)]),
 
         // Aplikacja paska menu (SwiftUI).
