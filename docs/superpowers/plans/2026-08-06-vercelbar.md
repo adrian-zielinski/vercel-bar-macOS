@@ -1736,7 +1736,7 @@ struct ProjectRowView: View {
             Spacer(minLength: 8)
             HStack(spacing: 3) {
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(deploy.map { Format.relative($0.createdAt) } ?? "")
+                    Text((deploy?.createdAt).map { Format.relative($0) } ?? "")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.tertiary)
                     durationLabel
@@ -1787,6 +1787,7 @@ struct ProjectRowView: View {
         case .error: "Error"
         case .building, .initializing: "Building"
         case .canceled: "Canceled"
+        case .unknown: "—"
         default: "Queued"
         }
     }
@@ -1823,8 +1824,7 @@ struct ProjectRowView: View {
     private var durationText: String? {
         guard let deploy else { return nil }
         if let done = deploy.duration { return Format.duration(done) }
-        if isBuilding {
-            let start = deploy.buildingAt ?? deploy.createdAt
+        if isBuilding, let start = deploy.buildingAt ?? deploy.createdAt {
             return Format.duration(Date().timeIntervalSince(start))
         }
         return nil
