@@ -1550,9 +1550,15 @@ final class AppModel: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in await self?.refresh() }
         }
-        let stored = (try? keychain.readToken()) ?? nil
-        hasToken = stored != nil
-        guard hasToken else { phase = .onboarding; return }
+        do {
+            let stored = try keychain.readToken()
+            hasToken = stored != nil
+            guard hasToken else { phase = .onboarding; return }
+        } catch {
+            // Pęk chwilowo niedostępny (np. ACL po aktualizacji podpisu) — nie zakładaj braku
+            // tokenu; pętla odpytywania da odczytowi kolejne szanse.
+            hasToken = true
+        }
         phase = .normal
         restartPolling()
     }
@@ -1622,10 +1628,16 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Walidacja tokenu i zapis. Zwraca false przy odrzuceniu.
-    func connect(token: String) async -> Bool {
+    enum ConnectResult: Equatable {
+        case ok
+        case rejected        // Vercel odrzucił token (albo pusty)
+        case keychainFailure // token poprawny, ale zapis do pęku się nie powiódł
+    }
+
+    /// Walidacja tokenu i zapis.
+    func connect(token: String) async -> ConnectResult {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
+        guard !trimmed.isEmpty else { return .rejected }
         do {
             let api = VercelAPI(token: trimmed)
             account = try await api.user()
@@ -1636,9 +1648,11 @@ final class AppModel: ObservableObject {
             phase = .normal
             await loadAllProjects()
             restartPolling()
-            return true
+            return .ok
+        } catch is KeychainStore.KeychainError {
+            return .keychainFailure
         } catch {
-            return false
+            return .rejected
         }
     }
 
@@ -2141,7 +2155,7 @@ struct SettingsView: View {
 
     @State private var tab: Tab = .konto
     @State private var tokenField = ""
-    @State private var tokenRejected = false
+    @State private var connectProblem: AppModel.ConnectResult?
     @State private var search = ""
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var notifySuccess = true
@@ -2190,17 +2204,16 @@ struct SettingsView: View {
                             .font(.system(size: 12))
                         Button("Zapisz") {
                             Task {
-                                tokenRejected = !(await model.connect(token: tokenField))
-                                if !tokenRejected { tokenField = "" }
+                                let result = await model.connect(token: tokenField)
+                                connectProblem = result == .ok ? nil : result
+                                if result == .ok { tokenField = "" }
                             }
                         }
                         .disabled(tokenField.isEmpty)
                     }
-                    Text(tokenRejected
-                         ? "Vercel odrzucił ten token. Sprawdź, czy skopiowany w całości."
-                         : "Token z panelu Vercela → Account Settings → Tokens. Zakres: tylko odczyt.")
+                    Text(tokenHint)
                         .font(.system(size: 10.5))
-                        .foregroundStyle(tokenRejected ? Color(nsColor: Theme.error) : .secondary)
+                        .foregroundStyle(connectProblem == nil ? Color.secondary : Color(nsColor: Theme.error))
                 }
             }
 
@@ -2240,6 +2253,14 @@ struct SettingsView: View {
                 .labelsHidden()
                 .frame(width: 196)
             }
+        }
+    }
+
+    private var tokenHint: String {
+        switch connectProblem {
+        case .rejected: "Vercel odrzucił ten token. Sprawdź, czy skopiowany w całości."
+        case .keychainFailure: "Token poprawny, ale zapis w pęku kluczy się nie powiódł. Otwórz Keychain Access i sprawdź dostęp."
+        default: "Token z panelu Vercela → Account Settings → Tokens. Zakres: tylko odczyt."
         }
     }
 
