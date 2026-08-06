@@ -442,4 +442,15 @@ do {
     t.equal(e, .offline, "URLError → offline")
 } catch { t.check(false, "zły typ błędu: \(error)") }
 
+t.suite("VercelAPI — anulowanie i timeout")
+let stubCancel = StubSession()
+stubCancel.thrownError = URLError(.cancelled)
+do {
+    _ = try await VercelAPI(token: "t", session: stubCancel).user()
+    t.check(false, "anulowanie powinno rzucić")
+} catch is CancellationError {
+    t.check(true, "URLError.cancelled → CancellationError, nie offline")
+} catch { t.check(false, "anulowanie zmapowane źle: \(error)") }
+t.equal(stub.lastRequest?.timeoutInterval, 15, "timeout requestu 15 s")
+
 t.finish()

@@ -54,12 +54,17 @@ public struct VercelAPI: Sendable {
 
         var request = URLRequest(url: comps.url!)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15 // krócej niż domyślne 60 s — przy pollingu co 10 s requesty by się nawarstwiały
 
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await session.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError() // anulowany polling to nie brak sieci
+        } catch let e as URLError where e.code == .cancelled {
+            throw CancellationError()
         } catch {
-            throw VercelAPIError.offline // każdy błąd transportu traktujemy jak brak sieci
+            throw VercelAPIError.offline // każdy inny błąd transportu = brak sieci
         }
         guard let http = response as? HTTPURLResponse else { throw VercelAPIError.invalidResponse }
         switch http.statusCode {
