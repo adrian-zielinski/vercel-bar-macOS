@@ -236,4 +236,106 @@ t.equal(Format.clock(noon, timeZone: cal.timeZone), "12:04", "zegar HH:mm")
 let afternoon = cal.date(from: DateComponents(year: 2026, month: 8, day: 6, hour: 13, minute: 0))!
 t.equal(Format.clock(afternoon, timeZone: cal.timeZone), "13:00", "zegar 24-godzinny, nie 1:00 PM")
 
+// MARK: - Silnik powiadomień
+
+func summary(id: String, state: DeployState) -> DeploymentSummary {
+    DeploymentSummary(id: id, state: state, branch: "main", commitMessage: "zmiana",
+                      createdAt: Date(timeIntervalSince1970: 0), buildingAt: nil, readyAt: nil,
+                      previewURL: nil, inspectorURL: nil)
+}
+func project(_ name: String, id: String, deploy: DeploymentSummary?) -> Project {
+    Project(id: id, name: name, latest: deploy)
+}
+
+t.suite("NotificationEngine — cisza na starcie")
+var engine = NotificationEngine()
+let first = engine.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
+t.equal(first, [], "pierwsze pobranie nie powiadamia nawet o błędzie")
+
+t.suite("NotificationEngine — błąd")
+var e2 = NotificationEngine()
+_ = e2.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+let errEvents = e2.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
+t.equal(errEvents.count, 1, "building → error daje zdarzenie")
+t.equal(errEvents.first?.kind, .failed, "rodzaj: failed")
+t.equal(errEvents.first?.projectName, "sklep", "nazwa projektu w zdarzeniu")
+let errAgain = e2.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
+t.equal(errAgain, [], "ten sam błąd nie powiadamia drugi raz")
+
+t.suite("NotificationEngine — nowy deploy od razu w błędzie")
+var e3 = NotificationEngine()
+_ = e3.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+let freshErr = e3.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .error))])
+t.equal(freshErr.count, 1, "nowy deployment z błędem powiadamia")
+
+t.suite("NotificationEngine — sukces")
+var e4 = NotificationEngine()
+_ = e4.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+let okEvents = e4.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+t.equal(okEvents.count, 1, "building → ready daje zdarzenie")
+t.equal(okEvents.first?.kind, .succeeded, "rodzaj: succeeded")
+
+var e5 = NotificationEngine()
+_ = e5.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+let silentOK = e5.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
+t.equal(silentOK, [], "deploy, którego nie widzieliśmy w toku, nie powiadamia o sukcesie")
+
+t.suite("NotificationEngine — nowy projekt w trakcie działania")
+var e6 = NotificationEngine()
+_ = e6.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+let newProj = e6.ingest(projects: [
+    project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready)),
+    project("blog", id: "p2", deploy: summary(id: "x1", state: .error)),
+])
+t.equal(newProj, [], "świeżo dodany projekt najpierw dostaje baseline")
+
+t.suite("NotificationEngine — realne sekwencje pollingu")
+
+// Start aplikacji przy projekcie, który leży w błędzie: kolejne odpytania mają milczeć.
+var e7 = NotificationEngine()
+_ = e7.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
+let stillErr = e7.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
+t.equal(stillErr, [], "błąd zastany na starcie nie powiadamia przy kolejnym odpytaniu")
+
+// Pełny cykl: push → kolejka → build (kilka odpytań) → sukces.
+var e8 = NotificationEngine()
+_ = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+let pushed = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .queued))])
+t.equal(pushed, [], "nowy deploy w kolejce nie powiadamia")
+let mid1 = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .building))])
+let mid2 = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .building))])
+t.equal(mid1 + mid2, [], "kolejne odpytania w trakcie builda milczą")
+let done = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
+t.equal(done.count, 1, "queued → building → ready powiadamia o sukcesie")
+t.equal(done.first?.deployment.id, "d2", "zdarzenie niesie właściwy deployment")
+let afterDone = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
+t.equal(afterDone, [], "sukces nie powtarza się przy kolejnym odpytaniu")
+
+// Anulowanie builda to nie błąd — bez powiadomienia.
+var e9 = NotificationEngine()
+_ = e9.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+let canceled = e9.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .canceled))])
+t.equal(canceled, [], "anulowany build nie powiadamia")
+
+// Migawka bez deployu (świeży projekt albo luka w odpowiedzi API) nie kasuje baseline.
+var e10 = NotificationEngine()
+_ = e10.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+let hole = e10.ingest(projects: [project("sklep", id: "p1", deploy: nil)])
+t.equal(hole, [], "projekt bez deployu nie generuje zdarzenia")
+let afterHole = e10.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+t.equal(afterHole.count, 1, "po luce nadal wiemy, że deploy był w toku")
+
+// Dwa projekty psują się w tym samym odpytaniu — dwa zdarzenia, każde ze swoją nazwą.
+var e11 = NotificationEngine()
+_ = e11.ingest(projects: [
+    project("sklep", id: "p1", deploy: summary(id: "d1", state: .building)),
+    project("blog", id: "p2", deploy: summary(id: "x1", state: .building)),
+])
+let both = e11.ingest(projects: [
+    project("sklep", id: "p1", deploy: summary(id: "d1", state: .error)),
+    project("blog", id: "p2", deploy: summary(id: "x1", state: .error)),
+])
+t.equal(both.count, 2, "dwa błędy naraz dają dwa zdarzenia")
+t.equal(both.map(\.projectName), ["sklep", "blog"], "kolejność zdarzeń idzie za kolejnością projektów")
+
 t.finish()
