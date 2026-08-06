@@ -193,9 +193,10 @@ t.equal(StatusAggregator.headline(for: [.error, .ready]), "1 deploy padł", "nag
 t.equal(StatusAggregator.headline(for: [.error, .error, .ready]), "2 deploye padły", "nagłówek 2 błędy")
 t.equal(StatusAggregator.headline(for: [.error, .error, .error, .error, .error]), "5 deployów padło", "nagłówek 5 błędów")
 t.equal(StatusAggregator.headline(for: Array(repeating: .error, count: 12)), "12 deployów padło", "nagłówek 12 błędów (nastki)")
+t.equal(StatusAggregator.headline(for: Array(repeating: .error, count: 21)), "21 deployów padło", "nagłówek 21 błędów (końcówka 1)")
 t.equal(StatusAggregator.headline(for: Array(repeating: .error, count: 22)), "22 deploye padły", "nagłówek 22 błędów")
 t.equal(StatusAggregator.headline(for: []), "Brak obserwowanych projektów", "nagłówek pusty")
-t.equal(StatusAggregator.headline(for: [.canceled, .unknown]), "Brak obserwowanych projektów", "canceled + unknown → nagłówek pusty")
+t.equal(StatusAggregator.headline(for: [.canceled, .unknown]), "Brak aktywnych deployów", "canceled + unknown → brak aktywnych, nie brak projektów")
 
 t.suite("PollScheduler")
 t.equal(PollScheduler.interval(anyActive: false), 30, "spokój → 30 s")
