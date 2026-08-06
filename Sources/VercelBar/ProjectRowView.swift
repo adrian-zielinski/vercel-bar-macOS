@@ -13,6 +13,34 @@ struct ProjectRowView: View {
     private var isBuilding: Bool { deploy?.state == .building || deploy?.state == .initializing }
 
     var body: some View {
+        Button(action: open) { rowContent }
+            .buttonStyle(.plain)
+            .background {
+                ZStack {
+                    rowBackground
+                    // Rozbłysk Building → Ready leży POD treścią, jak `background` w makiecie.
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(Color(nsColor: Theme.successFlash))
+                        .opacity(flash ? 1 : 0)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .padding(.horizontal, 5)
+            .onHover { hovered = $0 }
+            .accessibilityLabel("\(project.name), \(badgeLabel)")
+            .accessibilityValue(accessibilityDetails)
+            .accessibilityHint("Otwiera deploy w przeglądarce")
+            .onChange(of: deploy?.state) { old, new in
+                guard !reduceMotion, old == .building || old == .initializing, new == .ready else { return }
+                // Koperta makiety `vb-flash 420ms`: szczyt przy 28 %, wygaszenie do 420 ms.
+                withAnimation(.spring(duration: 0.12, bounce: 0.3)) { flash = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    withAnimation(.easeOut(duration: 0.3)) { flash = false }
+                }
+            }
+    }
+
+    private var rowContent: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -25,13 +53,19 @@ struct ProjectRowView: View {
                     Text(deploy?.branch ?? "—")
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
-                    Text("·").foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .fixedSize()
+                    Text("·")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
                     Text(deploy?.commitMessage ?? "brak danych o commicie")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                if isBuilding { progressBar.padding(.top, 5) }
+                if isBuilding {
+                    ProgressSweep(reduceMotion: reduceMotion).padding(.top, 5)
+                }
             }
             Spacer(minLength: 8)
             HStack(spacing: 3) {
@@ -39,6 +73,8 @@ struct ProjectRowView: View {
                     Text((deploy?.createdAt).map { Format.relative($0) } ?? "")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .fixedSize()
                     durationLabel
                 }
                 Image(systemName: "arrow.up.right")
@@ -46,27 +82,16 @@ struct ProjectRowView: View {
                     .foregroundStyle(.secondary)
                     .opacity(hovered ? 1 : 0)
                     .offset(x: hovered ? 0 : -6)
+                    .animation(reduceMotion ? nil : .spring(duration: 0.2, bounce: 0.3),
+                               value: hovered)
             }
         }
         .padding(EdgeInsets(top: 7, leading: 9, bottom: 7, trailing: 8))
-        .background(rowBackground)
-        .overlay( // rozbłysk Building → Ready
-            RoundedRectangle(cornerRadius: 7)
-                .fill(Color(nsColor: Theme.successFlash))
-                .opacity(flash ? 1 : 0)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-        .padding(.horizontal, 5)
         .contentShape(Rectangle())
-        .onHover { hovered = $0 }
-        .onTapGesture { open() }
-        .onChange(of: deploy?.state) { old, new in
-            guard !reduceMotion, old == .building || old == .initializing, new == .ready else { return }
-            withAnimation(.spring(duration: 0.12, bounce: 0.3)) { flash = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
-                withAnimation(.easeOut(duration: 0.3)) { flash = false }
-            }
-        }
+    }
+
+    private var accessibilityDetails: String {
+        [deploy?.branch, deploy?.commitMessage].compactMap { $0 }.joined(separator: ", ")
     }
 
     private var badge: some View {
@@ -111,7 +136,16 @@ struct ProjectRowView: View {
         }
     }
 
+    /// Trwający build tyka co sekundę; zakończony deploy ma stałą wartość i nie potrzebuje harmonogramu.
     @ViewBuilder private var durationLabel: some View {
+        if deploy?.duration == nil, isBuilding {
+            TimelineView(.periodic(from: .now, by: 1)) { _ in durationChip }
+        } else {
+            durationChip
+        }
+    }
+
+    @ViewBuilder private var durationChip: some View {
         if let text = durationText {
             HStack(spacing: 3) {
                 Image(systemName: "stopwatch").font(.system(size: 7.5))
@@ -135,41 +169,44 @@ struct ProjectRowView: View {
         RoundedRectangle(cornerRadius: 7)
             .fill(isError
                   ? Color(nsColor: hovered ? Theme.rowErrorHoverBg : Theme.rowErrorBg)
-                  : Color.primary.opacity(hovered ? 0.045 : 0))
+                  : Color(nsColor: Theme.rowHoverBg).opacity(hovered ? 1 : 0))
             .overlay {
                 if isError {
                     RoundedRectangle(cornerRadius: 7)
                         .strokeBorder(Color(nsColor: Theme.rowErrorRing), lineWidth: 0.5)
                 }
             }
-    }
-
-    /// Pasek postępu (nieokreślony) przy buildzie — jak w makiecie: 34 % szerokości, przelot 1,5 s.
-    private var progressBar: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.08))
-                if reduceMotion {
-                    Capsule().fill(Color(nsColor: Theme.building)).frame(width: w * 0.34)
-                } else {
-                    TimelineView(.animation) { context in
-                        let t = context.date.timeIntervalSinceReferenceDate
-                            .truncatingRemainder(dividingBy: 1.5) / 1.5
-                        Capsule()
-                            .fill(Color(nsColor: Theme.building))
-                            .frame(width: w * 0.34)
-                            .offset(x: (w * 1.34) * t - w * 0.34)
-                    }
-                }
-            }
-        }
-        .frame(height: 2)
-        .clipShape(Capsule())
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hovered)
     }
 
     private func open() {
         guard let url = deploy?.inspectorURL ?? deploy?.previewURL else { return }
         NSWorkspace.shared.open(url)
+    }
+}
+
+/// Pasek postępu (nieokreślony) przy buildzie — jak w makiecie: 34 % szerokości, przelot 1,5 s.
+/// Osobny widok, żeby `@State sweep` startowało od zera przy każdym wejściu paska.
+private struct ProgressSweep: View {
+    let reduceMotion: Bool
+    @State private var sweep = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color(nsColor: Theme.progressTrack))
+                Capsule()
+                    .fill(Color(nsColor: Theme.building))
+                    .frame(width: w * 0.34)
+                    .offset(x: sweep ? w : -w * 0.34)
+                    .animation(reduceMotion ? nil
+                               : .easeInOut(duration: 1.5).repeatForever(autoreverses: false),
+                               value: sweep)
+            }
+            .onAppear { if !reduceMotion { sweep = true } }
+        }
+        .frame(height: 2)
+        .clipShape(Capsule())
     }
 }

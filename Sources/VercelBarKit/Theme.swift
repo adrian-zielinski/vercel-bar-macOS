@@ -34,4 +34,10 @@ public enum Theme {
     public static let rowErrorHoverBg = dynamicColor(light: hex(0xd70015, alpha: 0.085), dark: hex(0xff453a, alpha: 0.13))
     public static let rowErrorRing = dynamicColor(light: hex(0xd70015, alpha: 0.20), dark: hex(0xff453a, alpha: 0.24))
     public static let successFlash = dynamicColor(light: hex(0x1d7f38, alpha: 0.16), dark: hex(0x30d158, alpha: 0.20))
+
+    // Powierzchnie neutralne — makieta rozróżnia motywy, więc nie Color.primary.opacity.
+    public static let rowHoverBg = dynamicColor(light: hex(0x000000, alpha: 0.045), dark: hex(0xffffff, alpha: 0.065))
+    public static let controlHoverBg = dynamicColor(light: hex(0x000000, alpha: 0.05), dark: hex(0xffffff, alpha: 0.07))
+    public static let progressTrack = dynamicColor(light: hex(0x000000, alpha: 0.07), dark: hex(0xffffff, alpha: 0.10))
+    public static let onboardingLogo = dynamicColor(light: hex(0x3c3c43, alpha: 0.28), dark: hex(0xebebf5, alpha: 0.28))
 }

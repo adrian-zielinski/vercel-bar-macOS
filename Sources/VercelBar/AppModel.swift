@@ -115,7 +115,7 @@ final class AppModel: ObservableObject {
         do {
             let snapshot = try await RefreshCore.fetch(api: api,
                                                        watchedProjectIDs: settings.watchedProjectIDs)
-            withAnimation(reduceMotion ? nil : .spring(duration: 0.22)) {
+            withAnimation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.3)) {
                 projects = snapshot.projects
                 overall = snapshot.overall
                 anyActive = snapshot.anyActive

@@ -6,6 +6,10 @@ struct PopoverView: View {
     @ObservedObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    /// Puls kropki nagłówka żyje lokalnie — `model.iconAlpha` zostaje wyłącznie dla ikony w pasku menu.
+    private var pulsing: Bool { model.iconState == .building && !reduceMotion }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,7 +27,12 @@ struct PopoverView: View {
             Circle()
                 .fill(Color(nsColor: StatusIconRenderer.color(for: model.iconState)))
                 .frame(width: 8, height: 8)
-                .opacity(model.overall == .building ? model.iconAlpha : 1)
+                .scaleEffect(pulsing && pulse ? 1.15 : 1)
+                .opacity(pulsing ? (pulse ? 1 : 0.55) : 1)
+                .animation(pulsing ? .easeInOut(duration: 0.55).repeatForever(autoreverses: true) : nil,
+                           value: pulse)
+                .onAppear { pulse = pulsing }
+                .onChange(of: pulsing) { _, on in pulse = on }
             Text(headline).font(.system(size: 13, weight: .semibold))
             Spacer()
             Text(model.lastRefreshed.map { "odświeżono \(Format.clock($0))" } ?? "")
@@ -56,8 +65,6 @@ struct PopoverView: View {
                     ForEach(model.projects) { ProjectRowView(project: $0) }
                 }
                 .padding(.top, 5).padding(.bottom, 6)
-                .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.3),
-                           value: model.projects.map(\.id))
             }
         }
     }
@@ -156,11 +163,24 @@ struct PopoverView: View {
 
 /// Delikatne tło na hover, jak w makiecie stopki.
 struct FooterButtonStyle: ButtonStyle {
-    @State private var hovered = false
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(hovered || configuration.isPressed ? 0.05 : 0)))
-            .onHover { hovered = $0 }
+        Hoverable(configuration: configuration)
+    }
+
+    /// `@State` nie działa wiarygodnie w `ButtonStyle` (to nie `View`) — stan mieszka w zagnieżdżonym widoku.
+    private struct Hoverable: View {
+        let configuration: ButtonStyleConfiguration
+        @State private var hovered = false
+
+        var body: some View {
+            configuration.label
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(nsColor: Theme.controlHoverBg))
+                        .opacity(hovered || configuration.isPressed ? 1 : 0)
+                )
+                .onHover { hovered = $0 }
+                .animation(.easeOut(duration: 0.12), value: hovered)
+        }
     }
 }
