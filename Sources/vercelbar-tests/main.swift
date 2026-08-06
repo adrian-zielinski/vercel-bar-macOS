@@ -370,32 +370,61 @@ t.equal(okTwice, [], "ten sam sukces nie wraca po regresie stanu z API")
 
 // MARK: - Klient VercelAPI
 
+/// Stub sesji HTTP. Stan chroniony lockiem — Task 10 poda tę samą instancję
+/// do równoległego task group, więc zapisy muszą znieść współbieżność.
 final class StubSession: HTTPSession, @unchecked Sendable {
-    var responses: [String: (Int, Data)] = [:] // fragment URL → (status, body)
-    var lastRequest: URLRequest?
-    var thrownError: Error?
+    struct StubError: Error {}
+
+    /// Runner wstrzyknięty, nie brany z globalnej `t` — `t` jest izolowane MainActorem,
+    /// a `data(for:)` biegnie poza nim (w Swift 6 byłby to błąd, nie ostrzeżenie).
+    private let runner: Runner
+    init(runner: Runner) { self.runner = runner }
+
+    private let lock = NSLock()
+    private var storedResponses: [String: (Int, Data)] = [:] // fragment URL → (status, body)
+    private var storedRequests: [URLRequest] = []
+    private var storedError: Error?
+
+    var responses: [String: (Int, Data)] {
+        get { lock.withLock { storedResponses } }
+        set { lock.withLock { storedResponses = newValue } }
+    }
+
+    var requests: [URLRequest] { lock.withLock { storedRequests } }
+    var lastRequest: URLRequest? { lock.withLock { storedRequests.last } }
+
+    var thrownError: Error? {
+        get { lock.withLock { storedError } }
+        set { lock.withLock { storedError = newValue } }
+    }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        lastRequest = request
-        if let thrownError { throw thrownError }
         let url = request.url!.absoluteString
-        for (fragment, (status, body)) in responses where url.contains(fragment) {
-            let resp = HTTPURLResponse(url: request.url!, statusCode: status,
-                                       httpVersion: nil, headerFields: nil)!
-            return (body, resp)
+        let (error, matches) = lock.withLock { () -> (Error?, [(Int, Data)]) in
+            storedRequests.append(request)
+            return (storedError, storedResponses.filter { url.contains($0.key) }.map(\.value))
         }
-        fatalError("brak stubu dla \(url)")
+        if let error { throw error }
+        // Niejednoznaczne dopasowanie zgłaszamy jako porażkę testu zamiast ubijać runner.
+        guard matches.count == 1, let (status, body) = matches.first else {
+            runner.check(false, "stub: \(matches.count) dopasowań dla \(url)")
+            throw StubError()
+        }
+        let resp = HTTPURLResponse(url: request.url!, statusCode: status,
+                                   httpVersion: nil, headerFields: nil)!
+        return (body, resp)
     }
 }
 
 t.suite("VercelAPI — nagłówki i parametry")
-let stub = StubSession()
+let stub = StubSession(runner: t)
 stub.responses["/v2/user"] = (200, Data(#"{"user":{"uid":"u1","username":"marta","name":null}}"#.utf8))
 let api = VercelAPI(token: "tok_123", teamID: "team_9", session: stub)
 let user = try await api.user()
 t.equal(user.username, "marta", "user dekoduje się")
 t.equal(stub.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer tok_123", "nagłówek Bearer")
 t.check(stub.lastRequest?.url?.query?.contains("teamId=team_9") == true, "teamId w query")
+t.equal(stub.lastRequest?.timeoutInterval, 15, "timeout requestu 15 s")
 
 t.suite("VercelAPI — latestDeployment")
 stub.responses["/v6/deployments"] = (200, Data("""
@@ -407,8 +436,20 @@ t.equal(latest?.id, "d9", "najnowszy deploy z /v6/deployments")
 t.check(stub.lastRequest?.url?.query?.contains("projectId=prj_1") == true, "projectId w query")
 t.check(stub.lastRequest?.url?.query?.contains("limit=1") == true, "limit=1 w query")
 
+t.suite("VercelAPI — projects i teams")
+stub.responses["/v9/projects"] = (200, Data(#"{"projects":[{"id":"p1","name":"sklep"}]}"#.utf8))
+let projList = try await api.projects()
+t.equal(projList.map(\.id), ["p1"], "projects dekoduje się")
+t.check(stub.lastRequest?.url?.path == "/v9/projects", "ścieżka /v9/projects")
+t.check(stub.lastRequest?.url?.query?.contains("limit=100") == true, "limit=100 w query")
+t.check(stub.lastRequest?.url?.query?.contains("teamId=team_9") == true, "teamId na /v9/projects")
+
+stub.responses["/v2/teams"] = (200, Data(#"{"teams":[{"id":"t1","name":"Nord","slug":"nord"}]}"#.utf8))
+let teamList = try await api.teams()
+t.equal(teamList.map(\.slug), ["nord"], "teams dekoduje się")
+
 t.suite("VercelAPI — mapowanie błędów")
-let stubErr = StubSession()
+let stubErr = StubSession(runner: t)
 stubErr.responses["/v2/user"] = (401, Data("{}".utf8))
 do {
     _ = try await VercelAPI(token: "zły", session: stubErr).user()
@@ -433,7 +474,7 @@ do {
     t.equal(e, .server(500), "500 → server(500)")
 } catch { t.check(false, "zły typ błędu: \(error)") }
 
-let stubOffline = StubSession()
+let stubOffline = StubSession(runner: t)
 stubOffline.thrownError = URLError(.notConnectedToInternet)
 do {
     _ = try await VercelAPI(token: "t", session: stubOffline).user()
@@ -442,8 +483,8 @@ do {
     t.equal(e, .offline, "URLError → offline")
 } catch { t.check(false, "zły typ błędu: \(error)") }
 
-t.suite("VercelAPI — anulowanie i timeout")
-let stubCancel = StubSession()
+t.suite("VercelAPI — anulowanie")
+let stubCancel = StubSession(runner: t)
 stubCancel.thrownError = URLError(.cancelled)
 do {
     _ = try await VercelAPI(token: "t", session: stubCancel).user()
@@ -451,9 +492,8 @@ do {
 } catch is CancellationError {
     t.check(true, "URLError.cancelled → CancellationError, nie offline")
 } catch { t.check(false, "anulowanie zmapowane źle: \(error)") }
-t.equal(stub.lastRequest?.timeoutInterval, 15, "timeout requestu 15 s")
 
-let stubCancel2 = StubSession()
+let stubCancel2 = StubSession(runner: t)
 stubCancel2.thrownError = CancellationError()
 do {
     _ = try await VercelAPI(token: "t", session: stubCancel2).user()

@@ -22,22 +22,37 @@ public struct VercelAPI: Sendable {
     private let session: any HTTPSession
     private static let base = URL(string: "https://api.vercel.com")!
 
-    public init(token: String, teamID: String? = nil, session: any HTTPSession = URLSession.shared) {
+    /// Sesja z twardym deadline'em (15 s na cały request) i bez cache —
+    /// stan deployu ma być świeży, a wiszący request nie może blokować pętli odświeżania.
+    private static let defaultSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 15
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: config)
+    }()
+
+    /// `session: nil` bierze `defaultSession`. Sentinel zamiast domyślnej wartości argumentu,
+    /// bo publiczny init nie może sięgnąć po prywatną statyczną własność.
+    public init(token: String, teamID: String? = nil, session: (any HTTPSession)? = nil) {
         self.token = token
         self.teamID = teamID
-        self.session = session
+        self.session = session ?? VercelAPI.defaultSession
     }
 
     public func user() async throws -> VercelUser {
-        try APIDecoding.user(from: await get("/v2/user"))
+        let data = try await get("/v2/user")
+        return try APIDecoding.user(from: data)
     }
 
     public func teams() async throws -> [Team] {
-        try APIDecoding.teams(from: await get("/v2/teams"))
+        let data = try await get("/v2/teams")
+        return try APIDecoding.teams(from: data)
     }
 
     public func projects() async throws -> [Project] {
-        try APIDecoding.projects(from: await get("/v9/projects", query: ["limit": "100"]))
+        let data = try await get("/v9/projects", query: ["limit": "100"])
+        return try APIDecoding.projects(from: data)
     }
 
     public func latestDeployment(projectID: String) async throws -> DeploymentSummary? {
