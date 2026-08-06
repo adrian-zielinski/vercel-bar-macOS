@@ -541,6 +541,57 @@ t.equal(snapshot.projects.map(\.name).sorted(), ["blog-firmowy", "sklep-online"]
 t.equal(snapshot.overall, .building, "stan zbiorczy z najnowszych deployów")
 t.equal(snapshot.anyActive, true, "anyActive gdy build w toku")
 
+t.suite("RefreshCore — stabilna kolejność przy równym createdAt")
+// Task group kończy się w losowej kolejności, więc remis po createdAt musi rozstrzygać nazwa.
+let tieStub = StubSession(runner: t)
+tieStub.responses["/v9/projects"] = (200, Data("""
+{"projects":[{"id":"pz","name":"zebra"},{"id":"pa","name":"alfa"},{"id":"pm","name":"Migdał"}]}
+""".utf8))
+for pid in ["pz", "pa", "pm"] {
+    tieStub.responses["projectId=\(pid)"] = (200, Data("""
+    {"deployments":[{"uid":"d-\(pid)","state":"READY","createdAt":1754470000000}]}
+    """.utf8))
+}
+let tieAPI = VercelAPI(token: "t", session: tieStub)
+var tieOrders: [[String]] = []
+for _ in 0..<5 {
+    tieOrders.append(try await RefreshCore.fetch(api: tieAPI,
+                                                 watchedProjectIDs: ["pz", "pa", "pm"]).projects.map(\.name))
+}
+t.equal(Set(tieOrders.map { $0.joined(separator: "|") }).count, 1, "pięć przebiegów daje tę samą kolejność")
+// „Migdał" pośrodku pilnuje, żeby porównanie zostało nieczułe na wielkość liter (ASCII dałby „Migdał" na przedzie).
+t.equal(tieOrders.first ?? [], ["alfa", "Migdał", "zebra"], "remis rozstrzyga nazwa, bez względu na wielkość liter")
+
+t.suite("RefreshCore — brzegi migawki")
+rcStub.responses["projectId=p3"] = (200, Data(#"{"deployments":[]}"#.utf8))
+
+let rcMissing = try await RefreshCore.fetch(api: rcAPI, watchedProjectIDs: ["p1", "prj_usuniety"])
+t.equal(rcMissing.projects.map(\.name), ["sklep-online"], "obserwowany projekt spoza /v9/projects jest pomijany")
+
+let rcEmpty = try await RefreshCore.fetch(api: rcAPI, watchedProjectIDs: [])
+t.equal(rcEmpty.projects.count, 0, "brak obserwowanych → pusta migawka")
+t.equal(rcEmpty.overall, .idle, "pusta migawka → idle")
+t.equal(rcEmpty.anyActive, false, "pusta migawka → nic aktywnego")
+
+let rcNoDeploys = try await RefreshCore.fetch(api: rcAPI, watchedProjectIDs: ["p3"])
+t.equal(rcNoDeploys.projects.count, 1, "projekt bez deployów zostaje w migawce")
+t.check(rcNoDeploys.projects.first?.latest == nil, "projekt bez deployów ma latest == nil")
+t.equal(rcNoDeploys.overall, .idle, "sam projekt bez deployów → idle")
+
+t.suite("RefreshCore — błąd deploymentów wywraca całą migawkę")
+// Świadomy trade-off „wszystko albo nic": lepiej zostawić poprzednie dane niż pokazać dziurawe.
+let rcErrStub = StubSession(runner: t)
+rcErrStub.responses["/v9/projects"] = (200, Data(#"{"projects":[{"id":"p1","name":"sklep"},{"id":"p2","name":"blog"}]}"#.utf8))
+rcErrStub.responses["projectId=p1"] = (500, Data("{}".utf8))
+rcErrStub.responses["projectId=p2"] = (200, Data(#"{"deployments":[{"uid":"d2","state":"READY"}]}"#.utf8))
+do {
+    _ = try await RefreshCore.fetch(api: VercelAPI(token: "t", session: rcErrStub),
+                                    watchedProjectIDs: ["p1", "p2"])
+    t.check(false, "500 na deploymentach powinien rzucić")
+} catch let e as VercelAPIError {
+    t.equal(e, .server(500), "500 jednego projektu przerywa cały fetch")
+} catch { t.check(false, "zły typ błędu: \(error)") }
+
 // MARK: - KeychainStore
 
 t.suite("KeychainStore")

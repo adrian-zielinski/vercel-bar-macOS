@@ -24,7 +24,14 @@ public enum RefreshCore {
             }
             for try await p in group { filled.append(p) }
         }
-        filled.sort { ($0.latest?.createdAt ?? .distantPast) > ($1.latest?.createdAt ?? .distantPast) }
+        // Nazwa rozstrzyga remisy: task group kończy się w losowej kolejności, a bez tego
+        // wiersze popovera tasowałyby się między odświeżeniami przy równym createdAt.
+        filled.sort {
+            let l = $0.latest?.createdAt ?? .distantPast
+            let r = $1.latest?.createdAt ?? .distantPast
+            if l != r { return l > r }
+            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
 
         let states = filled.compactMap { $0.latest?.state }
         return Snapshot(projects: filled,

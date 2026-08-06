@@ -40,6 +40,7 @@ final class AppModel: ObservableObject {
     private var tokenAlertShown = false
     private var started = false
     private var consecutiveFailures = 0 // backoff dla 429/5xx
+    private var keychainReadFailures = 0 // pojedyncza czkawka pęku ≠ utrata sesji
     private var refreshInFlight = false
 
     var iconState: AggregateState {
@@ -93,9 +94,21 @@ final class AppModel: ObservableObject {
         guard !refreshInFlight else { return }
         refreshInFlight = true
         defer { refreshInFlight = false }
+        // SecItemCopyMatching jest synchroniczne i przy systemowym promptcie potrafi stanąć
+        // na kilka sekund — na MainActorze zamroziłoby ikonę paska menu.
+        let kc = keychain
+        let readResult: Result<String?, Error> = await Task.detached { Result { try kc.readToken() } }.value
         let storedToken: String?
-        do { storedToken = try keychain.readToken() } catch {
-            return // Keychain chwilowo niedostępny (np. po aktualizacji podpisu) — nie zrywaj sesji
+        switch readResult {
+        case .success(let value):
+            storedToken = value
+            keychainReadFailures = 0
+        case .failure:
+            // Chwilowa niedostępność pęku (np. ACL po aktualizacji podpisu) nie zrywa sesji;
+            // dopiero seria porażek znaczy trwały problem i wymaga wyjścia przez Ustawienia.
+            keychainReadFailures += 1
+            if keychainReadFailures >= 3 { phase = .tokenInvalid }
+            return
         }
         guard let token = storedToken else { phase = .onboarding; hasToken = false; return }
         let api = VercelAPI(token: token, teamID: settings.teamID)
@@ -118,6 +131,7 @@ final class AppModel: ObservableObject {
             }
         } catch VercelAPIError.unauthorized {
             phase = .tokenInvalid
+            consecutiveFailures += 1 // bez sensu młócić 401 co 30 s; connect() zeruje licznik
             updatePulse(active: false)
             if !tokenAlertShown {
                 tokenAlertShown = true
@@ -125,6 +139,7 @@ final class AppModel: ObservableObject {
             }
         } catch VercelAPIError.offline {
             phase = .offline
+            anyActive = false // stara migawka nie może trzymać pętli na 10 s bez sieci
             updatePulse(active: false)
         } catch is CancellationError {
             // Anulowany polling (restart pętli) — nie zmieniaj stanu.
@@ -145,6 +160,8 @@ final class AppModel: ObservableObject {
             try keychain.writeToken(trimmed)
             hasToken = true
             tokenAlertShown = false
+            keychainReadFailures = 0
+            consecutiveFailures = 0 // świeży token wraca do pełnego tempa, bez backoffu po 401
             phase = .normal
             await loadAllProjects()
             restartPolling()
