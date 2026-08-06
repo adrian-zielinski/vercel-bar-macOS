@@ -1520,6 +1520,7 @@ final class AppModel: ObservableObject {
     @Published var iconAlpha: Double = 1
     @Published var account: VercelUser?
     @Published var teams: [Team] = []
+    @Published var hasToken = false // dla UI — widoki nie dotykają Keychaina w body
 
     let keychain = KeychainStore()
     let settings = SettingsStore()
@@ -1549,7 +1550,9 @@ final class AppModel: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in await self?.refresh() }
         }
-        guard keychain.readToken() != nil else { phase = .onboarding; return }
+        let stored = (try? keychain.readToken()) ?? nil
+        hasToken = stored != nil
+        guard hasToken else { phase = .onboarding; return }
         phase = .normal
         restartPolling()
     }
@@ -1578,7 +1581,11 @@ final class AppModel: ObservableObject {
         guard !refreshInFlight else { return }
         refreshInFlight = true
         defer { refreshInFlight = false }
-        guard let token = keychain.readToken() else { phase = .onboarding; return }
+        let storedToken: String?
+        do { storedToken = try keychain.readToken() } catch {
+            return // Keychain chwilowo niedostępny (np. po aktualizacji podpisu) — nie zrywaj sesji
+        }
+        guard let token = storedToken else { phase = .onboarding; hasToken = false; return }
         let api = VercelAPI(token: token, teamID: settings.teamID)
         do {
             let snapshot = try await RefreshCore.fetch(api: api,
@@ -1624,6 +1631,7 @@ final class AppModel: ObservableObject {
             account = try await api.user()
             teams = (try? await api.teams()) ?? []
             try keychain.writeToken(trimmed)
+            hasToken = true
             tokenAlertShown = false
             phase = .normal
             await loadAllProjects()
@@ -1636,7 +1644,7 @@ final class AppModel: ObservableObject {
 
     /// Lista wszystkich projektów dla Ustawień (zakładka Projekty).
     func loadAllProjects() async {
-        guard let token = keychain.readToken() else { return }
+        guard let token = (try? keychain.readToken()) ?? nil else { return }
         let api = VercelAPI(token: token, teamID: settings.teamID)
         allProjects = (try? await api.projects()) ?? []
         if account == nil { account = try? await api.user() }
@@ -2176,8 +2184,7 @@ struct SettingsView: View {
             row(label: "Token dostępu") {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 7) {
-                        SecureField(model.keychain.readToken() == nil
-                                    ? "wklej token…" : "••••••••••••••••••••",
+                        SecureField(model.hasToken ? "••••••••••••••••••••" : "wklej token…",
                                     text: $tokenField)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 12))
@@ -2548,6 +2555,7 @@ Po przeglądach jakości Tasków 1–2 wprowadzono zmiany względem kodu wklejon
 10. **`refresh()` ma osłonę przed reentrancją** (`refreshInFlight`) — pętla, przycisk Odśwież i didWake mogą się nałożyć; snippet Taska 10 wyżej już poprawiony. `NotificationEngine.ingest` przycina `lastSeen` do projektów bieżącej migawki (reset baseline po odznaczeniu projektu).
 11. **`VercelAPI.get`**: anulowanie (`CancellationError`, `URLError(.cancelled)`) rzuca `CancellationError`, NIE `.offline`; `refresh()` łapie je osobno i nie zmienia stanu (snippet wyżej poprawiony). Timeout requestu 15 s + własna `defaultSession` (ephemeral, resource-timeout 15 s, bez cache). Świadome odroczenia po v1: mapowanie `DecodingError` na własny case, paginacja `/v9/projects` powyżej 100 projektów, rozróżnienie 403 od 401, kod statusu w `invalidResponse`.
 12. **Drobiazgi do domknięcia przy Tasku 10** (z re-review Taska 6): (a) w `StubSession` wciągnąć `runner.check(...)` do `lock.withLock` — task group może zgłosić miss równolegle; (b) wydzielić `internal static let defaultConfiguration` w `VercelAPI` i dodać asercje `timeoutIntervalForResource == 15` i `requestCachePolicy == .reloadIgnoringLocalCacheData` (dziś blok `defaultSession` nie ma żadnego strażnika); (c) skrócić przestarzały komentarz przy `request.timeoutInterval = 15` (dubluje się z komentarzem przy `defaultSession`).
+13. **KeychainStore po recenzji**: `readToken` rzuca (`nil` tylko dla errSecItemNotFound — brak tokenu ≠ błąd odczytu), `deleteToken` zwraca `Bool` (@discardableResult), świadomie klasyczny pęk login (data-protection keychain wymaga entitlementu, którego ad-hoc podpis nie ma). `AppModel` ma `@Published var hasToken` — widoki NIE dotykają Keychaina w body; `refresh()` przy błędzie odczytu przerywa cykl bez zmiany fazy (snippety Tasków 10/12 wyżej poprawione).
 
 ---
 
