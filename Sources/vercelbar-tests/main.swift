@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import VercelBarKit
 
 // Lekki harness testowy (wzorzec skryba-tests; nie wymaga XCTest ani Xcode).
@@ -501,5 +502,34 @@ do {
 } catch is CancellationError {
     t.check(true, "CancellationError przechodzi bez mapowania na offline")
 } catch { t.check(false, "CancellationError zmapowany źle: \(error)") }
+
+// MARK: - KeychainStore
+
+t.suite("KeychainStore")
+
+/// Statusy oznaczające brak dostępu do pęku kluczy (CI, sesja bez zalogowanego użytkownika,
+/// zablokowany pęk) — wtedy suite jest pomijana, a nie failowana.
+func keychainUnavailable(_ status: OSStatus) -> Bool {
+    [errSecNotAvailable, errSecInteractionNotAllowed, errSecAuthFailed,
+     errSecMissingEntitlement, errSecUserCanceled].contains(status)
+}
+
+// Osobna usługa testowa, żeby nie dotykać tokenu produkcyjnego; sprzątamy przed i po.
+let kc = KeychainStore(service: "pl.zielinski.vercelbar.testy")
+kc.deleteToken(account: "test")
+t.equal(kc.readToken(account: "test"), nil, "brak tokenu przed zapisem")
+do {
+    try kc.writeToken("tok_abc", account: "test")
+    t.equal(kc.readToken(account: "test"), "tok_abc", "odczyt po zapisie")
+    try kc.writeToken("tok_nowy", account: "test")
+    t.equal(kc.readToken(account: "test"), "tok_nowy", "nadpisanie tokenu")
+    kc.deleteToken(account: "test")
+    t.equal(kc.readToken(account: "test"), nil, "brak tokenu po usunięciu")
+} catch let KeychainStore.KeychainError.status(st) where keychainUnavailable(st) {
+    t.skip("Keychain niedostępny: OSStatus \(st)")
+} catch {
+    t.check(false, "Keychain rzucił: \(error)")
+}
+kc.deleteToken(account: "test") // gdyby zapis przerwał się w połowie
 
 t.finish()
