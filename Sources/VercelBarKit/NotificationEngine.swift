@@ -15,7 +15,9 @@ public struct DeployEvent: Equatable, Sendable {
 /// Trzyma baseline per projekt (cisza na pierwszą obserwację) i deduplikuje po id deploymentu.
 public struct NotificationEngine {
     private var lastSeen: [String: DeploymentSummary] = [:] // projectID → ostatni znany deploy
-    private var notified: Set<String> = []                  // "deployID|kind"
+    /// "deployID|kind" — rośnie przez całe życie procesu świadomie: przycinanie groziłoby
+    /// powtórnym powiadomieniem, gdyby stary deploy wrócił na szczyt listy projektu.
+    private var notified: Set<String> = []
 
     public init() {}
 
@@ -44,6 +46,13 @@ public struct NotificationEngine {
                 }
             }
         }
+
+        // Projekt odznaczony traci baseline — po ponownym zaznaczeniu najpierw dostaje świeży,
+        // zamiast wystrzelić powiadomieniem o zdarzeniu sprzed przerwy w obserwacji.
+        // Projekt obecny w migawce bez deployu (`latest == nil`) zostaje — to czkawka API, nie odznaczenie.
+        let currentIDs = Set(projects.map(\.id))
+        lastSeen = lastSeen.filter { currentIDs.contains($0.key) }
+
         return events
     }
 }

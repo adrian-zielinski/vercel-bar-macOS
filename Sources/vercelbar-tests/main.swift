@@ -338,4 +338,25 @@ let both = e11.ingest(projects: [
 t.equal(both.count, 2, "dwa błędy naraz dają dwa zdarzenia")
 t.equal(both.map(\.projectName), ["sklep", "blog"], "kolejność zdarzeń idzie za kolejnością projektów")
 
+t.suite("NotificationEngine — dedup przy powrocie starego deployu")
+var e12 = NotificationEngine()
+_ = e12.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+_ = e12.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))]) // 1. powiadomienie
+_ = e12.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .building))])
+let backToErr = e12.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
+t.equal(backToErr, [], "ten sam błąd po przetasowaniu deployów nie powiadamia drugi raz")
+
+t.suite("NotificationEngine — sukces innego deployu niż obserwowany")
+var e13 = NotificationEngine()
+_ = e13.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+let otherReady = e13.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
+t.equal(otherReady, [], "ready innego deployu niż widziany w toku nie powiadamia")
+
+t.suite("NotificationEngine — odznaczenie i ponowne zaznaczenie projektu")
+var e14 = NotificationEngine()
+_ = e14.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+_ = e14.ingest(projects: []) // projekt odznaczony — baseline znika
+let rewatch = e14.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
+t.equal(rewatch, [], "po ponownym zaznaczeniu najpierw świeży baseline, bez powiadomienia o starym błędzie")
+
 t.finish()
