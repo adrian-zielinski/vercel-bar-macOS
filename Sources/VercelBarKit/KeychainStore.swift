@@ -2,6 +2,10 @@ import Foundation
 import Security
 
 /// Token Vercela w Keychain (kSecClassGenericPassword).
+///
+/// Świadoma decyzja: klasyczny pęk login (`login.keychain-db`), BEZ `kSecUseDataProtectionKeychain`.
+/// Data-protection keychain wymaga entitlementu `keychain-access-groups`, którego podpis ad-hoc
+/// nie ma — zapytania kończyłyby się błędem -34018 (`errSecMissingEntitlement`).
 public struct KeychainStore: Sendable {
     /// Usługa w pęku kluczy; testy podmieniają ją na własną, żeby nie ruszać tokenu produkcyjnego.
     public let service: String
@@ -20,15 +24,22 @@ public struct KeychainStore: Sendable {
          kSecAttrAccount as String: account]
     }
 
-    /// `nil`, gdy wpisu nie ma albo pęk kluczy go nie oddał — wołający traktuje to jak brak tokenu.
-    public func readToken(account: String = "vercel-token") -> String? {
+    /// nil = tokenu naprawdę nie ma (`errSecItemNotFound`). Inne niepowodzenia rzucają —
+    /// wołający decyduje, czy to chwilowe (nie zrywaj sesji), czy trwałe.
+    /// Po aktualizacji aplikacji podpisanej ad-hoc pęk oddaje `errSecAuthFailed`; to nie jest
+    /// „użytkownik się wylogował".
+    public func readToken(account: String = "vercel-token") throws -> String? {
         var query = baseQuery(account: account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else { throw KeychainError.status(status) }
+        guard let data = result as? Data, let token = String(data: data, encoding: .utf8) else {
+            throw KeychainError.status(errSecDecode)
+        }
+        return token
     }
 
     /// Nadpisuje istniejący wpis, a przy jego braku zakłada nowy.
@@ -47,8 +58,11 @@ public struct KeychainStore: Sendable {
         }
     }
 
+    /// true = wpis usunięty albo nie istniał; false = usunięcie się nie powiodło.
     /// Brak wpisu to nie błąd — wylogowanie ma być idempotentne.
-    public func deleteToken(account: String = "vercel-token") {
-        SecItemDelete(baseQuery(account: account) as CFDictionary)
+    @discardableResult
+    public func deleteToken(account: String = "vercel-token") -> Bool {
+        let status = SecItemDelete(baseQuery(account: account) as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 }

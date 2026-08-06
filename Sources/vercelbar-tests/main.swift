@@ -517,14 +517,15 @@ func keychainUnavailable(_ status: OSStatus) -> Bool {
 // Osobna usługa testowa, żeby nie dotykać tokenu produkcyjnego; sprzątamy przed i po.
 let kc = KeychainStore(service: "pl.zielinski.vercelbar.testy")
 kc.deleteToken(account: "test")
-t.equal(kc.readToken(account: "test"), nil, "brak tokenu przed zapisem")
 do {
+    t.equal(try kc.readToken(account: "test"), nil, "brak tokenu przed zapisem")
     try kc.writeToken("tok_abc", account: "test")
-    t.equal(kc.readToken(account: "test"), "tok_abc", "odczyt po zapisie")
+    t.equal(try kc.readToken(account: "test"), "tok_abc", "odczyt po zapisie")
     try kc.writeToken("tok_nowy", account: "test")
-    t.equal(kc.readToken(account: "test"), "tok_nowy", "nadpisanie tokenu")
-    kc.deleteToken(account: "test")
-    t.equal(kc.readToken(account: "test"), nil, "brak tokenu po usunięciu")
+    t.equal(try kc.readToken(account: "test"), "tok_nowy", "nadpisanie tokenu")
+    t.check(kc.deleteToken(account: "test"), "usunięcie istniejącego wpisu zwraca true")
+    t.equal(try kc.readToken(account: "test"), nil, "brak tokenu po usunięciu")
+    t.check(kc.deleteToken(account: "test"), "usunięcie nieistniejącego wpisu też zwraca true")
 } catch let KeychainStore.KeychainError.status(st) where keychainUnavailable(st) {
     t.skip("Keychain niedostępny: OSStatus \(st)")
 } catch {
