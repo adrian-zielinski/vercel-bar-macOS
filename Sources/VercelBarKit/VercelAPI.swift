@@ -22,15 +22,18 @@ public struct VercelAPI: Sendable {
     private let session: any HTTPSession
     private static let base = URL(string: "https://api.vercel.com")!
 
-    /// Sesja z twardym deadline'em (15 s na cały request) i bez cache —
-    /// stan deployu ma być świeży, a wiszący request nie może blokować pętli odświeżania.
-    private static let defaultSession: URLSession = {
+    /// Twardy deadline (15 s na cały request) i brak cache — stan deployu ma być świeży,
+    /// a wiszący request nie może blokować pętli odświeżania.
+    /// Publiczna, bo strażnik tych wartości siedzi w runnerze testów, a ten jest osobnym modułem.
+    public static let defaultConfiguration: URLSessionConfiguration = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 15
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(configuration: config)
+        return config
     }()
+
+    private static let defaultSession = URLSession(configuration: defaultConfiguration)
 
     /// `session: nil` bierze `defaultSession`. Sentinel zamiast domyślnej wartości argumentu,
     /// bo publiczny init nie może sięgnąć po prywatną statyczną własność.
@@ -69,7 +72,7 @@ public struct VercelAPI: Sendable {
 
         var request = URLRequest(url: comps.url!)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 15 // krócej niż domyślne 60 s — przy pollingu co 10 s requesty by się nawarstwiały
+        request.timeoutInterval = 15 // dubluje deadline dla wstrzykniętych sesji
 
         let (data, response): (Data, URLResponse)
         do {

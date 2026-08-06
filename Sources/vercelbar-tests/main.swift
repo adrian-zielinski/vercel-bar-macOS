@@ -204,6 +204,15 @@ t.suite("PollScheduler")
 t.equal(PollScheduler.interval(anyActive: false), 30, "spokój → 30 s")
 t.equal(PollScheduler.interval(anyActive: true), 10, "build w toku → 10 s")
 
+t.suite("PollScheduler.delay — backoff")
+t.equal(PollScheduler.delay(base: 30, consecutiveFailures: 0), 30, "0 porażek → base")
+t.equal(PollScheduler.delay(base: 10, consecutiveFailures: 0), 10, "0 porażek → base także przy buildzie")
+t.equal(PollScheduler.delay(base: 30, consecutiveFailures: 1), 60, "1 porażka → 60 s")
+t.equal(PollScheduler.delay(base: 30, consecutiveFailures: 2), 120, "2 porażki → 120 s")
+t.equal(PollScheduler.delay(base: 30, consecutiveFailures: 3), 240, "3 porażki → 240 s")
+t.equal(PollScheduler.delay(base: 30, consecutiveFailures: 4), 300, "4 porażki → sufit 300 s")
+t.equal(PollScheduler.delay(base: 10, consecutiveFailures: 1), 60, "backoff ignoruje base")
+
 // MARK: - Formatowanie czasu
 
 t.suite("Format.relative")
@@ -408,8 +417,10 @@ final class StubSession: HTTPSession, @unchecked Sendable {
         }
         if let error { throw error }
         // Niejednoznaczne dopasowanie zgłaszamy jako porażkę testu zamiast ubijać runner.
+        // Zgłoszenie pod tym samym lockiem — Runner nie jest bezpieczny wątkowo, a równoległy
+        // task group może trafić w miss dwoma zapytaniami naraz.
         guard matches.count == 1, let (status, body) = matches.first else {
-            runner.check(false, "stub: \(matches.count) dopasowań dla \(url)")
+            lock.withLock { runner.check(false, "stub: \(matches.count) dopasowań dla \(url)") }
             throw StubError()
         }
         let resp = HTTPURLResponse(url: request.url!, statusCode: status,
@@ -503,6 +514,32 @@ do {
 } catch is CancellationError {
     t.check(true, "CancellationError przechodzi bez mapowania na offline")
 } catch { t.check(false, "CancellationError zmapowany źle: \(error)") }
+
+t.suite("VercelAPI — konfiguracja domyślnej sesji")
+t.equal(VercelAPI.defaultConfiguration.timeoutIntervalForResource, 15, "twardy deadline 15 s")
+t.check(VercelAPI.defaultConfiguration.requestCachePolicy == .reloadIgnoringLocalCacheData, "bez cache")
+
+// MARK: - RefreshCore
+
+t.suite("RefreshCore")
+let rcStub = StubSession(runner: t)
+rcStub.responses["/v9/projects"] = (200, Data("""
+{"projects":[{"id":"p1","name":"sklep-online"},{"id":"p2","name":"blog-firmowy"},{"id":"p3","name":"inny"}]}
+""".utf8))
+rcStub.responses["projectId=p1"] = (200, Data("""
+{"deployments":[{"uid":"d1","state":"BUILDING","createdAt":1754470000000,
+ "meta":{"githubCommitRef":"feat/koszyk","githubCommitMessage":"dodaj podsumowanie"}}]}
+""".utf8))
+rcStub.responses["projectId=p2"] = (200, Data("""
+{"deployments":[{"uid":"d2","state":"READY","createdAt":1754470000000,
+ "buildingAt":1754470002000,"ready":1754470040000,"meta":{"githubCommitRef":"main","githubCommitMessage":"mdx"}}]}
+""".utf8))
+let rcAPI = VercelAPI(token: "t", session: rcStub)
+let snapshot = try await RefreshCore.fetch(api: rcAPI, watchedProjectIDs: ["p1", "p2"])
+t.equal(snapshot.projects.count, 2, "tylko obserwowane projekty")
+t.equal(snapshot.projects.map(\.name).sorted(), ["blog-firmowy", "sklep-online"], "nazwy z /v9/projects")
+t.equal(snapshot.overall, .building, "stan zbiorczy z najnowszych deployów")
+t.equal(snapshot.anyActive, true, "anyActive gdy build w toku")
 
 // MARK: - KeychainStore
 
