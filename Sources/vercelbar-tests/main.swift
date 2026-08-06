@@ -172,4 +172,33 @@ do {
     t.equal(ts.first?.slug, "studio-nord", "team slug")
 } catch { t.check(false, "dekodowanie teamów rzuciło: \(error)") }
 
+// MARK: - Agregacja stanu
+
+t.suite("StatusAggregator")
+t.equal(StatusAggregator.aggregate([.ready, .ready]), .ready, "same ready → ready")
+t.equal(StatusAggregator.aggregate([.ready, .building]), .building, "building wygrywa z ready")
+t.equal(StatusAggregator.aggregate([.building, .error]), .error, "error wygrywa ze wszystkim")
+t.equal(StatusAggregator.aggregate([.ready, .queued]), .building, "queued liczy się jak building")
+t.equal(StatusAggregator.aggregate([.ready, .initializing]), .building, "initializing liczy się jak building")
+t.equal(StatusAggregator.aggregate([.canceled, .ready]), .ready, "canceled nie zmienia stanu")
+t.equal(StatusAggregator.aggregate([.canceled]), .idle, "same canceled → idle")
+t.equal(StatusAggregator.aggregate([.unknown, .ready]), .ready, "unknown nie zmienia stanu")
+t.equal(StatusAggregator.aggregate([.unknown]), .idle, "same unknown → idle")
+t.equal(StatusAggregator.aggregate([]), .idle, "pusto → idle")
+
+t.suite("Nagłówek popovera")
+t.equal(StatusAggregator.headline(for: [.ready, .ready]), "Wszystko wdrożone", "nagłówek ready")
+t.equal(StatusAggregator.headline(for: [.ready, .building]), "Build w toku…", "nagłówek building")
+t.equal(StatusAggregator.headline(for: [.error, .ready]), "1 deploy padł", "nagłówek 1 błąd")
+t.equal(StatusAggregator.headline(for: [.error, .error, .ready]), "2 deploye padły", "nagłówek 2 błędy")
+t.equal(StatusAggregator.headline(for: [.error, .error, .error, .error, .error]), "5 deployów padło", "nagłówek 5 błędów")
+t.equal(StatusAggregator.headline(for: Array(repeating: .error, count: 12)), "12 deployów padło", "nagłówek 12 błędów (nastki)")
+t.equal(StatusAggregator.headline(for: Array(repeating: .error, count: 22)), "22 deploye padły", "nagłówek 22 błędów")
+t.equal(StatusAggregator.headline(for: []), "Brak obserwowanych projektów", "nagłówek pusty")
+t.equal(StatusAggregator.headline(for: [.canceled, .unknown]), "Brak obserwowanych projektów", "canceled + unknown → nagłówek pusty")
+
+t.suite("PollScheduler")
+t.equal(PollScheduler.interval(anyActive: false), 30, "spokój → 30 s")
+t.equal(PollScheduler.interval(anyActive: true), 10, "build w toku → 10 s")
+
 t.finish()
