@@ -359,4 +359,13 @@ _ = e14.ingest(projects: []) // projekt odznaczony — baseline znika
 let rewatch = e14.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
 t.equal(rewatch, [], "po ponownym zaznaczeniu najpierw świeży baseline, bez powiadomienia o starym błędzie")
 
+t.suite("NotificationEngine — dedup sukcesu po regresie stanu z API")
+var e15 = NotificationEngine()
+_ = e15.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+let okOnce = e15.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+t.equal(okOnce.count, 1, "sukces zgłoszony raz")
+_ = e15.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))]) // odczyt z cache API
+let okTwice = e15.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+t.equal(okTwice, [], "ten sam sukces nie wraca po regresie stanu z API")
+
 t.finish()
