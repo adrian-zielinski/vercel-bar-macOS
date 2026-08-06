@@ -570,4 +570,56 @@ let icon = StatusIconRenderer.image(state: .ready)
 t.equal(icon.size, NSSize(width: 15, height: 13), "rozmiar ikony 15×13 pt (design)")
 t.check(!icon.isTemplate, "ikona kolorowa, nie szablonowa")
 
+// MARK: - Mapowanie jasny/ciemny
+
+// Kolor dynamiczny rozwiązuje się dopiero pod konkretnym wyglądem — bez tego zamiana light:/dark: przechodzi niezauważona.
+func resolved(_ color: NSColor, _ appearance: NSAppearance.Name) -> NSColor {
+    var out = color
+    NSAppearance(named: appearance)!.performAsCurrentDrawingAppearance {
+        out = color.usingColorSpace(.sRGB) ?? color
+    }
+    return out
+}
+
+func matchesHex(_ color: NSColor, _ value: UInt32, alpha: CGFloat = 1) -> Bool {
+    let tol: CGFloat = 1.0 / 255
+    return abs(color.redComponent - CGFloat((value >> 16) & 0xFF) / 255) <= tol
+        && abs(color.greenComponent - CGFloat((value >> 8) & 0xFF) / 255) <= tol
+        && abs(color.blueComponent - CGFloat(value & 0xFF) / 255) <= tol
+        && abs(color.alphaComponent - alpha) <= 0.005
+}
+
+t.suite("Theme — jasny/ciemny")
+t.check(matchesHex(resolved(Theme.ready, .aqua), 0x1d7f38), "ready w jasnym to #1d7f38")
+t.check(matchesHex(resolved(Theme.ready, .darkAqua), 0x30d158), "ready w ciemnym to #30d158")
+t.check(matchesHex(resolved(Theme.badgeReadyBg, .aqua), 0x1d7f38, alpha: 0.10), "tło badge ready w jasnym to zieleń 10 %")
+t.check(matchesHex(resolved(Theme.badgeReadyBg, .darkAqua), 0x30d158, alpha: 0.15), "tło badge ready w ciemnym to zieleń 15 %")
+t.check(matchesHex(resolved(Theme.rowErrorBg, .aqua), 0xd70015, alpha: 0.055), "tło wiersza błędu w jasnym to czerwień 5,5 %")
+t.check(matchesHex(resolved(Theme.rowErrorBg, .darkAqua), 0xff453a, alpha: 0.085), "tło wiersza błędu w ciemnym to czerwień 8,5 %")
+t.check(matchesHex(resolved(Theme.successFlash, .darkAqua), 0x30d158, alpha: 0.20), "rozbłysk sukcesu w ciemnym to zieleń 20 %")
+
+// MARK: - Orientacja trójkąta
+
+// Rysujemy w powiększeniu 8×, żeby próbkować rogi poza antyaliasingiem krawędzi.
+let iconScale = 8
+let iconW = 15 * iconScale, iconH = 13 * iconScale
+let iconRep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: iconW, pixelsHigh: iconH,
+                               bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                               colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+NSGraphicsContext.saveGraphicsState()
+NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: iconRep)
+icon.draw(in: NSRect(x: 0, y: 0, width: iconW, height: iconH))
+NSGraphicsContext.restoreGraphicsState()
+
+// NSBitmapImageRep liczy wiersze od góry, więc y = 0 to szczyt ikony.
+func iconAlpha(_ x: Int, _ y: Int) -> CGFloat { iconRep.colorAt(x: x, y: y)?.alphaComponent ?? 0 }
+let inset = iconScale // 1 pt od krawędzi
+
+t.suite("Orientacja ikony")
+t.check(iconAlpha(inset, inset) == 0 && iconAlpha(iconW - 1 - inset, inset) == 0,
+        "górne rogi puste — trójkąt nie stoi na wierzchołku")
+t.check(iconAlpha(inset, iconH - 1 - inset) > 0 && iconAlpha(iconW - 1 - inset, iconH - 1 - inset) > 0,
+        "dolne rogi wypełnione — podstawa na dole")
+t.check(iconAlpha(iconW / 2, inset) > 0, "wierzchołek u góry, na środku")
+
 t.finish()

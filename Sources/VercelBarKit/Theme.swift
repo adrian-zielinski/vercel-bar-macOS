@@ -28,4 +28,10 @@ public enum Theme {
     public static let badgeQueuedFg = dynamicColor(light: hex(0x6e6e73), dark: hex(0x98989d))
     public static let badgeQueuedBg = dynamicColor(light: NSColor(srgbRed: 60/255, green: 60/255, blue: 67/255, alpha: 0.08),
                                                    dark: NSColor(srgbRed: 235/255, green: 235/255, blue: 245/255, alpha: 0.11))
+
+    // Wiersz błędu i rozbłysk sukcesu — pary z makiet (jasny/ciemny różnią się nie tylko barwą, ale i alfą).
+    public static let rowErrorBg = dynamicColor(light: hex(0xd70015, alpha: 0.055), dark: hex(0xff453a, alpha: 0.085))
+    public static let rowErrorHoverBg = dynamicColor(light: hex(0xd70015, alpha: 0.085), dark: hex(0xff453a, alpha: 0.13))
+    public static let rowErrorRing = dynamicColor(light: hex(0xd70015, alpha: 0.20), dark: hex(0xff453a, alpha: 0.24))
+    public static let successFlash = dynamicColor(light: hex(0x1d7f38, alpha: 0.16), dark: hex(0x30d158, alpha: 0.20))
 }
