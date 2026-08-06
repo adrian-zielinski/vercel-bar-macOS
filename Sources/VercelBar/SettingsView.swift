@@ -149,7 +149,7 @@ struct SettingsView: View {
                 TextField("Szukaj projektów", text: $search)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12))
-                Text("\(model.settings.watchedProjectIDs.count) z \(model.allProjects.count) projektów monitorowanych")
+                Text(countLabel)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.tertiary)
                     .fixedSize()
@@ -165,7 +165,22 @@ struct SettingsView: View {
             }
             .listStyle(.bordered)
             .scrollContentBackground(.hidden)
+            .overlay {
+                if model.allProjects.isEmpty {
+                    Text(model.phase == .offline
+                         ? "Brak połączenia z Vercelem."
+                         : "Wczytywanie projektów…")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.tertiary)
+                }
+            }
         }
+    }
+
+    /// Zanim lista dojedzie, „3 z 0 projektów monitorowanych" zestawia trwałe ID z pustką.
+    private var countLabel: String {
+        guard !model.allProjects.isEmpty else { return "" }
+        return "\(model.settings.watchedProjectIDs.count) z \(model.allProjects.count) projektów monitorowanych"
     }
 
     private var filteredProjects: [Project] {
@@ -197,6 +212,7 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.mini)
+                .accessibilityLabel(label)
         }
         .frame(height: 27)
     }

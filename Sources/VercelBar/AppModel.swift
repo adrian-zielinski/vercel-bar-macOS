@@ -187,11 +187,16 @@ final class AppModel: ObservableObject {
     func toggleWatched(projectID: String) {
         var ids = settings.watchedProjectIDs
         if ids.contains(projectID) { ids.remove(projectID) } else { ids.insert(projectID) }
+        // SettingsStore to zwykła klasa nad UserDefaults, nie ObservableObject — bez tego
+        // licznik w Ustawieniach czeka na przerysowanie aż do końca refresh(), a gdy
+        // refresh odbije się od refreshInFlight albo padnie na 5xx, nie doczeka się wcale.
+        objectWillChange.send()
         settings.watchedProjectIDs = ids
         Task { await refresh() }
     }
 
     func selectTeam(id: String?) {
+        objectWillChange.send()
         settings.teamID = id
         engine = NotificationEngine() // nowy scope → nowy baseline
         Task {
