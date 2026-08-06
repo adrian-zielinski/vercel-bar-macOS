@@ -208,22 +208,32 @@ t.suite("Format.relative")
 let now = Date(timeIntervalSince1970: 1_754_470_000)
 func ago(_ s: TimeInterval) -> Date { now.addingTimeInterval(-s) }
 t.equal(Format.relative(ago(10), now: now), "teraz", "poniżej 45 s → teraz")
+t.equal(Format.relative(ago(44), now: now), "teraz", "44 s → jeszcze teraz")
 t.equal(Format.relative(ago(50), now: now), "50 s temu", "sekundy")
+t.equal(Format.relative(ago(89), now: now), "89 s temu", "89 s → jeszcze sekundy")
+t.equal(Format.relative(ago(90), now: now), "1 min temu", "90 s → już minuty")
 t.equal(Format.relative(ago(120), now: now), "2 min temu", "minuty")
 t.equal(Format.relative(ago(3600), now: now), "1 godz. temu", "godziny")
 t.equal(Format.relative(ago(5 * 3600), now: now), "5 godz. temu", "kilka godzin")
+t.equal(Format.relative(ago(86_399), now: now), "23 godz. temu", "tuż przed dobą")
+t.equal(Format.relative(ago(86_400), now: now), "wczoraj", "dokładnie doba")
 t.equal(Format.relative(ago(30 * 3600), now: now), "wczoraj", "24–48 h → wczoraj")
+t.equal(Format.relative(ago(172_800), now: now), "2 dni temu", "dokładnie dwie doby")
 t.equal(Format.relative(ago(3 * 86_400), now: now), "3 dni temu", "dni")
 
 t.suite("Format.duration")
+t.equal(Format.duration(0), "0 s", "zero")
 t.equal(Format.duration(38), "38 s", "sekundy")
 t.equal(Format.duration(126), "2 min 06 s", "minuty z zerem wiodącym sekund")
 t.equal(Format.duration(60), "1 min 00 s", "równa minuta")
+t.equal(Format.duration(3600), "60 min 00 s", "godzina bez rolowania — świadomy wybór")
 
 t.suite("Format.clock")
 var cal = Calendar(identifier: .gregorian)
 cal.timeZone = TimeZone(identifier: "Europe/Warsaw")!
 let noon = cal.date(from: DateComponents(year: 2026, month: 8, day: 6, hour: 12, minute: 4))!
 t.equal(Format.clock(noon, timeZone: cal.timeZone), "12:04", "zegar HH:mm")
+let afternoon = cal.date(from: DateComponents(year: 2026, month: 8, day: 6, hour: 13, minute: 0))!
+t.equal(Format.clock(afternoon, timeZone: cal.timeZone), "13:00", "zegar 24-godzinny, nie 1:00 PM")
 
 t.finish()
