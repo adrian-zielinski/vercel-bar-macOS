@@ -17,17 +17,9 @@ struct VercelBarApp: App {
         .menuBarExtraStyle(.window)
 
         Window("Ustawienia VercelBar", id: "settings") {
-            SettingsPlaceholderView(model: model) // zastąpione w Tasku 12
+            SettingsView(model: model)
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
-    }
-}
-
-// Tymczasowa zaślepka — Task 12 wstawia właściwe SettingsView.
-struct SettingsPlaceholderView: View {
-    @ObservedObject var model: AppModel
-    var body: some View {
-        Text("Ustawienia — w budowie").padding(40)
     }
 }

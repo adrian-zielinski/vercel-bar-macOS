@@ -175,9 +175,11 @@ final class AppModel: ObservableObject {
 
     /// Lista wszystkich projektów dla Ustawień (zakładka Projekty).
     func loadAllProjects() async {
-        guard let token = (try? keychain.readToken()) ?? nil else { return }
+        let kc = keychain
+        let stored: String? = await Task.detached { (try? kc.readToken()) ?? nil }.value
+        guard let token = stored else { return }
         let api = VercelAPI(token: token, teamID: settings.teamID)
-        allProjects = (try? await api.projects()) ?? []
+        if let fetched = try? await api.projects() { allProjects = fetched } // błąd nie zeruje listy
         if account == nil { account = try? await api.user() }
         if teams.isEmpty { teams = (try? await VercelAPI(token: token).teams()) ?? [] }
     }
