@@ -453,4 +453,13 @@ do {
 } catch { t.check(false, "anulowanie zmapowane źle: \(error)") }
 t.equal(stub.lastRequest?.timeoutInterval, 15, "timeout requestu 15 s")
 
+let stubCancel2 = StubSession()
+stubCancel2.thrownError = CancellationError()
+do {
+    _ = try await VercelAPI(token: "t", session: stubCancel2).user()
+    t.check(false, "CancellationError powinien się propagować")
+} catch is CancellationError {
+    t.check(true, "CancellationError przechodzi bez mapowania na offline")
+} catch { t.check(false, "CancellationError zmapowany źle: \(error)") }
+
 t.finish()
