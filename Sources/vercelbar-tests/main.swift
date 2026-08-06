@@ -548,10 +548,12 @@ t.equal(settings.teamID, nil, "domyślnie konto osobiste")
 
 settings.watchedProjectIDs = ["prj_1", "prj_2"]
 settings.notifySuccess = false
+settings.notifyFailure = false
 settings.teamID = "team_9"
 let reloaded = SettingsStore(defaults: defaults)
 t.equal(reloaded.watchedProjectIDs, ["prj_1", "prj_2"], "obserwowane trwają po ponownym wczytaniu")
 t.equal(reloaded.notifySuccess, false, "wyłączenie sukcesów trwa")
+t.equal(reloaded.notifyFailure, false, "wyłączenie błędów trwa")
 t.equal(reloaded.teamID, "team_9", "team trwa")
 reloaded.teamID = nil
 t.equal(SettingsStore(defaults: defaults).teamID, nil, "powrót do konta osobistego")
