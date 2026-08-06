@@ -2521,6 +2521,19 @@ git add -A && git commit -m "Pakowanie VercelBar.app, ikona aplikacji i README"
 
 ---
 
+## Zatwierdzone odstępstwa od planu (obowiązują w kolejnych taskach)
+
+Po przeglądach jakości Tasków 1–2 wprowadzono zmiany względem kodu wklejonego wyżej. Implementując Taski 3–13 traktuj poniższe jako nadrzędne wobec snippetów planu:
+
+1. **`DeployState` ma case `.unknown`** — fallback dla nieznanych stanów API (nie `.queued`). `unknown` NIE jest aktywny. Każdy `switch` po stanie (badge, kolory) obsługuje `.unknown` jak `.canceled`/szary.
+2. **`DeploymentSummary.createdAt` to `Date?`** (bez sentinela 1970). `duration` wymaga `readyAt` i znanego startu. W UI: czas względny i sortowanie muszą znosić `nil` (`latest?.createdAt` → spłaszczone `Date?`, sortowanie z `?? .distantPast`).
+3. **`DeploymentSummary.init`** ma domyślne `nil` dla parametrów opcjonalnych.
+4. **`APIDecoding`**: `meta` dekodowane odpornie (`LossyStringDict` — nie-stringi pomijane); `previewURL` dokleja `https://` tylko gdy brak schematu.
+5. **Runner testów** ma dodatkowo `skip()`, zbiorczą sekcję „Niezaliczone:" i format porażki `[oczekiwano: X, jest: Y]`.
+6. **Architektura zapytań bez zmian** (N+1: `/v9/projects` + `/v6/deployments?projectId=`) — świadoma decyzja: gwarantowany `inspectorUrl`, limity API z zapasem. Ewentualna optymalizacja przez `latestDeployments` z `/v9/projects` to osobny task po v1.
+
+---
+
 ## Weryfikacja końcowa (po wszystkich taskach)
 
 - [ ] `swift run vercelbar-tests` — komplet zielony.
