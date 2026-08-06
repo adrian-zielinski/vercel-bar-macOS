@@ -42,15 +42,31 @@ t.check(true, "runner działa")
 
 // MARK: - Modele i dekodowanie API
 
+/// Dekoduje fixture i zwraca pierwszy deployment; porażkę odnotowuje zamiast ubijać runner.
+func firstDeployment(_ json: String, _ label: String) -> DeploymentSummary? {
+    do {
+        guard let d = try APIDecoding.deployments(from: Data(json.utf8)).first else {
+            t.check(false, "\(label): pusta lista deploymentów")
+            return nil
+        }
+        return d
+    } catch {
+        t.check(false, "\(label): dekodowanie rzuciło: \(error)")
+        return nil
+    }
+}
+
 t.suite("DeployState")
 t.equal(DeployState(rawAPI: "READY"), .ready, "READY parsuje się")
 t.equal(DeployState(rawAPI: "error"), .error, "wielkość liter bez znaczenia")
 t.equal(DeployState(rawAPI: "INITIALIZING"), .initializing, "INITIALIZING parsuje się")
-t.equal(DeployState(rawAPI: "COŚNOWEGO"), .queued, "nieznany stan spada do queued")
+t.equal(DeployState(rawAPI: "COŚNOWEGO"), .unknown, "nieznany stan spada do unknown")
+t.equal(DeployState(rawAPI: ""), .unknown, "pusty stan spada do unknown")
 t.check(DeployState.building.isActive && DeployState.queued.isActive && DeployState.initializing.isActive,
         "building/queued/initializing są aktywne")
 t.check(!DeployState.ready.isActive && !DeployState.error.isActive && !DeployState.canceled.isActive,
         "ready/error/canceled nie są aktywne")
+t.check(!DeployState.unknown.isActive, "unknown nie jest aktywny")
 
 t.suite("Dekodowanie /v6/deployments")
 let deploymentsJSON = Data("""
@@ -68,31 +84,70 @@ let deploymentsJSON = Data("""
 do {
     let list = try APIDecoding.deployments(from: deploymentsJSON)
     t.equal(list.count, 1, "jeden deployment")
-    let d = list[0]
-    t.equal(d.id, "dpl_abc123", "id z uid")
-    t.equal(d.state, .building, "stan BUILDING")
-    t.equal(d.branch, "feat/koszyk", "gałąź z meta github")
-    t.equal(d.commitMessage, "dodaj podsumowanie zamówienia", "commit z meta github")
-    t.equal(d.previewURL?.absoluteString, "https://sklep-online-git-feat-koszyk.vercel.app", "previewURL dostaje https://")
-    t.equal(d.inspectorURL?.absoluteString, "https://vercel.com/studio-nord/sklep-online/dpl_abc123", "inspectorURL wprost")
-    t.equal(d.createdAt, Date(timeIntervalSince1970: 1_754_470_000), "createdAt z milisekund")
-    t.equal(d.buildingAt, Date(timeIntervalSince1970: 1_754_470_005), "buildingAt z milisekund")
-    t.equal(d.duration, nil, "brak duration bez ready")
+    if let d = list.first {
+        t.equal(d.id, "dpl_abc123", "id z uid")
+        t.equal(d.state, .building, "stan BUILDING")
+        t.equal(d.branch, "feat/koszyk", "gałąź z meta github")
+        t.equal(d.commitMessage, "dodaj podsumowanie zamówienia", "commit z meta github")
+        t.equal(d.previewURL?.absoluteString, "https://sklep-online-git-feat-koszyk.vercel.app", "previewURL dostaje https://")
+        t.equal(d.inspectorURL?.absoluteString, "https://vercel.com/studio-nord/sklep-online/dpl_abc123", "inspectorURL wprost")
+        t.equal(d.createdAt, Date(timeIntervalSince1970: 1_754_470_000), "createdAt z milisekund")
+        t.equal(d.buildingAt, Date(timeIntervalSince1970: 1_754_470_005), "buildingAt z milisekund")
+        t.equal(d.duration, nil, "brak duration bez ready")
+    } else { t.check(false, "pusta lista deploymentów") }
 } catch { t.check(false, "dekodowanie deploymentów rzuciło: \(error)") }
 
 t.suite("Dekodowanie deploymentu READY + duration")
-let readyJSON = Data("""
+if let d = firstDeployment("""
 {"deployments":[{
   "uid":"dpl_done","state":"READY","createdAt":1754470000000,
   "buildingAt":1754470002000,"ready":1754470040000,
   "meta":{"gitlabCommitRef":"main","gitlabCommitMessage":"aktualizacja zależności"}
 }]}
-""".utf8)
-do {
-    let d = try APIDecoding.deployments(from: readyJSON)[0]
+""", "READY") {
     t.equal(d.duration, 38, "duration = ready − buildingAt")
     t.equal(d.branch, "main", "gałąź z meta gitlab")
-} catch { t.check(false, "dekodowanie READY rzuciło: \(error)") }
+}
+
+t.suite("Fallbacki i odporność dekodera")
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"m","state":"READY","meta":{"githubCommitRef":"main","buildId":123}}]}"#,
+                           "meta z liczbą") {
+    t.equal(d.branch, "main", "nie-stringowa wartość w meta nie wywala koperty")
+}
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"x","ready":1754470040000}]}"#, "brak createdAt") {
+    t.equal(d.createdAt, nil, "brak createdAt zostaje nil")
+    t.equal(d.duration, nil, "duration nil bez punktu startu")
+    t.equal(d.state, .unknown, "brak state i readyState → unknown")
+}
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"r","readyState":"READY"}]}"#, "readyState") {
+    t.equal(d.state, .ready, "stan czytany z readyState")
+}
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"c","created":1754470000000}]}"#, "created") {
+    t.equal(d.createdAt, Date(timeIntervalSince1970: 1_754_470_000), "createdAt czytany z created")
+}
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"b","meta":{"bitbucketCommitRef":"hotfix/logo","bitbucketCommitMessage":"popraw logo"}}]}"#,
+                           "bitbucket") {
+    t.equal(d.branch, "hotfix/logo", "gałąź z meta bitbucket")
+    t.equal(d.commitMessage, "popraw logo", "commit z meta bitbucket")
+}
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"d","state":"READY","createdAt":1754470000000,"ready":1754470030000}]}"#,
+                           "duration bez buildingAt") {
+    t.equal(d.duration, 30, "bez buildingAt duration liczone od createdAt")
+}
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"u","url":"https://x.vercel.app"}]}"#, "url ze schematem") {
+    t.equal(d.previewURL?.absoluteString, "https://x.vercel.app", "gotowy schemat nie jest doklejany drugi raz")
+}
+
+do {
+    t.equal(try APIDecoding.deployments(from: Data(#"{"deployments":[]}"#.utf8)).count, 0, "pusta lista deploymentów")
+} catch { t.check(false, "pusta lista rzuciła: \(error)") }
 
 t.suite("Dekodowanie /v9/projects, /v2/user, /v2/teams")
 let projectsJSON = Data("""
@@ -100,7 +155,8 @@ let projectsJSON = Data("""
 """.utf8)
 do {
     let ps = try APIDecoding.projects(from: projectsJSON)
-    t.equal(ps.map(\.name), ["sklep-online", "blog-firmowy"], "projekty: id i nazwy")
+    t.equal(ps.map(\.id), ["prj_1", "prj_2"], "projekty: id")
+    t.equal(ps.map(\.name), ["sklep-online", "blog-firmowy"], "projekty: nazwy")
 } catch { t.check(false, "dekodowanie projektów rzuciło: \(error)") }
 
 let userJSON = Data(#"{"user":{"uid":"u_1","username":"marta","name":"Marta Kowalska"}}"#.utf8)

@@ -8,10 +8,12 @@ public enum DeployState: String, Equatable, Sendable {
     case queued = "QUEUED"
     case initializing = "INITIALIZING"
     case canceled = "CANCELED"
+    /// Stan spoza znanego zbioru (np. DELETED, puste pole) — nie udaje builda w toku.
+    case unknown = "UNKNOWN"
 
-    /// Nieznane wartości spadają do `.queued` (neutralny szary).
+    /// Nieznane wartości spadają do `.unknown` (neutralny szary, bez pollingu co 10 s).
     public init(rawAPI: String) {
-        self = DeployState(rawValue: rawAPI.uppercased()) ?? .queued
+        self = DeployState(rawValue: rawAPI.uppercased()) ?? .unknown
     }
 
     /// Deploy w toku — INITIALIZING traktujemy jak BUILDING (spec).
@@ -26,15 +28,16 @@ public struct DeploymentSummary: Equatable, Sendable {
     public let state: DeployState
     public let branch: String?
     public let commitMessage: String?
-    public let createdAt: Date
+    /// Brak pola w odpowiedzi API zostaje `nil` — bez sentinela 1970, który psuł `duration`.
+    public let createdAt: Date?
     public let buildingAt: Date?
     public let readyAt: Date?
     public let previewURL: URL?
     public let inspectorURL: URL?
 
-    public init(id: String, state: DeployState, branch: String?, commitMessage: String?,
-                createdAt: Date, buildingAt: Date?, readyAt: Date?,
-                previewURL: URL?, inspectorURL: URL?) {
+    public init(id: String, state: DeployState, branch: String? = nil, commitMessage: String? = nil,
+                createdAt: Date? = nil, buildingAt: Date? = nil, readyAt: Date? = nil,
+                previewURL: URL? = nil, inspectorURL: URL? = nil) {
         self.id = id
         self.state = state
         self.branch = branch
@@ -46,10 +49,10 @@ public struct DeploymentSummary: Equatable, Sendable {
         self.inspectorURL = inspectorURL
     }
 
-    /// Czas budowania w sekundach (dla zakończonych deployów).
+    /// Czas budowania w sekundach (dla zakończonych deployów ze znanym początkiem).
     public var duration: TimeInterval? {
-        guard let readyAt else { return nil }
-        return readyAt.timeIntervalSince(buildingAt ?? createdAt)
+        guard let readyAt, let start = buildingAt ?? createdAt else { return nil }
+        return readyAt.timeIntervalSince(start)
     }
 }
 

@@ -3,6 +3,27 @@ import Foundation
 /// Dekodowanie surowych odpowiedzi API Vercela na modele domeny.
 public enum APIDecoding {
 
+    /// Słownik metadanych odporny na wartości nie-stringowe — pomija je zamiast wywalać dekodowanie.
+    struct LossyStringDict: Decodable {
+        let values: [String: String]
+
+        struct DynamicKey: CodingKey {
+            var stringValue: String
+            init?(stringValue: String) { self.stringValue = stringValue }
+            var intValue: Int? { nil }
+            init?(intValue: Int) { nil }
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: DynamicKey.self)
+            var out: [String: String] = [:]
+            for key in c.allKeys {
+                if let v = try? c.decode(String.self, forKey: key) { out[key.stringValue] = v }
+            }
+            values = out
+        }
+    }
+
     struct DeploymentsEnvelope: Decodable {
         struct Item: Decodable {
             let uid: String
@@ -14,7 +35,7 @@ public enum APIDecoding {
             let created: Double?
             let buildingAt: Double?
             let ready: Double?
-            let meta: [String: String]?
+            let meta: LossyStringDict?
         }
         let deployments: [Item]
     }
@@ -50,10 +71,10 @@ public enum APIDecoding {
     }
 
     /// Gałąź/commit siedzą w meta pod kluczem zależnym od dostawcy gita.
-    private static func metaValue(_ meta: [String: String]?, suffix: String) -> String? {
-        guard let meta else { return nil }
+    private static func metaValue(_ meta: LossyStringDict?, suffix: String) -> String? {
+        guard let values = meta?.values else { return nil }
         for provider in ["github", "gitlab", "bitbucket"] {
-            if let v = meta[provider + suffix] { return v }
+            if let v = values[provider + suffix] { return v }
         }
         return nil
     }
@@ -63,13 +84,15 @@ public enum APIDecoding {
         return env.deployments.map { item in
             DeploymentSummary(
                 id: item.uid,
-                state: DeployState(rawAPI: item.state ?? item.readyState ?? "QUEUED"),
+                state: DeployState(rawAPI: item.state ?? item.readyState ?? ""),
                 branch: metaValue(item.meta, suffix: "CommitRef"),
                 commitMessage: metaValue(item.meta, suffix: "CommitMessage"),
-                createdAt: date(fromMs: item.createdAt ?? item.created) ?? Date(timeIntervalSince1970: 0),
+                createdAt: date(fromMs: item.createdAt ?? item.created),
                 buildingAt: date(fromMs: item.buildingAt),
                 readyAt: date(fromMs: item.ready),
-                previewURL: item.url.flatMap { URL(string: "https://\($0)") },
+                previewURL: item.url.flatMap { raw in
+                    URL(string: raw.contains("://") ? raw : "https://\(raw)")
+                },
                 inspectorURL: item.inspectorUrl.flatMap(URL.init(string:))
             )
         }
