@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@keyframes vb-pulse { 0%,100% { transform: scale(1); opacity: .55 } 50% { transform: scale(1.15); opacity: 1 } }
+@keyframes vb-bar { 0% { transform: translateX(-105%) } 100% { transform: translateX(300%) } }
+@keyframes vb-flash { 0% { background: rgba(48,209,88,0) } 28% { background: light-dark(rgba(29,127,56,.16), rgba(48,209,88,.20)) } 100% { background: rgba(48,209,88,0) } }
+@keyframes vb-badge-in { from { opacity: 0; transform: scale(.94) } to { opacity: 1; transform: none } }
+@keyframes vb-badge-out { from { opacity: 1 } to { opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
+body { margin: 0; -webkit-font-smoothing: antialiased; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif }
+</style>
+</helmet>
+<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 12px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased">
+
+  <div style="width: 340px; box-sizing: border-box; border-radius: 12px; overflow: hidden; background: light-dark(rgba(250,250,250,.76), rgba(30,30,32,.74)); backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); box-shadow: 0 0 0 .5px light-dark(rgba(0,0,0,.10), rgba(255,255,255,.10)), 0 8px 26px light-dark(rgba(0,0,0,.13), rgba(0,0,0,.42)); color: light-dark(#1c1c1e, #f2f2f7)">
+
+    <sc-if value="{{ showHeader }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 11px 13px 10px 14px">
+        <div style="width: 8px; height: 8px; flex: none; border-radius: 50%; background: {{ dotColor }}; animation: {{ dotAnim }}"></div>
+        <div style="font-size: 13px; font-weight: 590; letter-spacing: -.08px">{{ headline }}</div>
+        <div style="margin-left: auto; font-size: 10.5px; letter-spacing: .1px; color: light-dark(rgba(60,60,67,.45), rgba(235,235,245,.42))">{{ refreshed }}</div>
+      </div>
+      <div style="height: .5px; background: light-dark(rgba(0,0,0,.09), rgba(255,255,255,.09))"></div>
+    </sc-if>
+
+    <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; padding: 5px 0 6px">
+        <sc-for list="{{ items }}" as="item" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-rows: {{ item.gt }}; overflow: hidden; opacity: {{ item.o }}; transition: grid-template-rows 220ms cubic-bezier(.34,1.30,.64,1), opacity 180ms ease-out">
+            <div style="min-height: 0">
+              <div style="display: flex; align-items: flex-start; gap: 8px; margin: 0 5px; padding: 7px 8px 7px 9px; border-radius: 7px; --vb-a: 0; --vb-ax: -6px; background: {{ item.rowBg }}; box-shadow: {{ item.rowRing }}; animation: {{ item.anim }}; transition: background 120ms ease-out" style-hover="--vb-a: 1; --vb-ax: 0px; background: {{ item.rowHover }}">
+                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                  <div style="display: flex; align-items: center; gap: 6px; min-width: 0">
+                    <div style="font-size: 12.5px; font-weight: 590; letter-spacing: -.05px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ item.name }}</div>
+                    <div style="display: inline-grid; flex: none">
+                      <div style="grid-area: 1/1; padding: 1.5px 5.5px; border-radius: 4px; font-size: 9.5px; font-weight: 620; letter-spacing: .1px; white-space: nowrap; background: {{ item.badgeBg }}; color: {{ item.badgeFg }}; animation: {{ item.badgeAnim }}">{{ item.badge }}</div>
+                      <sc-if value="{{ item.prevBadge }}" hint-placeholder-val="{{ false }}">
+                        <div style="grid-area: 1/1; padding: 1.5px 5.5px; border-radius: 4px; font-size: 9.5px; font-weight: 620; letter-spacing: .1px; white-space: nowrap; background: {{ item.prevBg }}; color: {{ item.prevFg }}; animation: vb-badge-out 180ms ease-out forwards">{{ item.prevBadge }}</div>
+                      </sc-if>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: baseline; gap: 5px; min-width: 0; font-size: 11px; color: light-dark(rgba(60,60,67,.62), rgba(235,235,245,.60))">
+                    <span style="flex: none; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; letter-spacing: -.1px; color: light-dark(rgba(60,60,67,.75), rgba(235,235,245,.70))">{{ item.branch }}</span>
+                    <span style="flex: none; opacity: .5">·</span>
+                    <span style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ item.commit }}</span>
+                  </div>
+                  <sc-if value="{{ item.building }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top: 5px; height: 2px; border-radius: 1px; overflow: hidden; background: light-dark(rgba(0,0,0,.07), rgba(255,255,255,.10))">
+                      <div style="width: 34%; height: 100%; border-radius: 1px; background: light-dark(#0064e0, #0a84ff); animation: {{ barAnim }}"></div>
+                    </div>
+                  </sc-if>
+                </div>
+                <div style="flex: none; display: flex; align-items: center; gap: 3px; padding-top: 1px">
+                  <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px">
+                    <div style="font-size: 10.5px; white-space: nowrap; color: light-dark(rgba(60,60,67,.45), rgba(235,235,245,.42))">{{ item.time }}</div>
+                    <sc-if value="{{ item.dur }}" hint-placeholder-val="{{ false }}">
+                      <div style="display: flex; align-items: center; gap: 3px; font-size: 9.5px; font-variant-numeric: tabular-nums; white-space: nowrap; color: light-dark(rgba(60,60,67,.42), rgba(235,235,245,.38))">
+                        <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="6" cy="6.7" r="4.5"></circle><path d="M6 4.4v2.3h1.6"></path><path d="M4.7 1.1h2.6"></path></svg>
+                        {{ item.dur }}
+                      </div>
+                    </sc-if>
+                  </div>
+                  <div style="width: 11px; height: 11px; opacity: var(--vb-a); transform: translateX(var(--vb-ax)); transition: opacity 180ms ease-out, transform 200ms cubic-bezier(.34,1.30,.64,1); color: light-dark(rgba(60,60,67,.5), rgba(235,235,245,.5))">
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 8.6 8.6 3.4"></path><path d="M4.4 3.4h4.2v4.2"></path></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isOnboarding }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 26px 26px; text-align: center">
+        <svg width="26" height="23" viewBox="0 0 26 23" style="color: light-dark(rgba(60,60,67,.28), rgba(235,235,245,.28))"><path d="M13 1 25.5 22H.5Z" fill="currentColor"></path></svg>
+        <div style="font-size: 12.5px; line-height: 1.45; max-width: 232px; text-wrap: pretty; color: light-dark(rgba(60,60,67,.72), rgba(235,235,245,.68))">Połącz konto Vercela, aby widzieć swoje deploye w pasku menu.</div>
+        <button style="margin-top: 2px; padding: 0 16px; height: 28px; border: 0; border-radius: 7px; font-family: inherit; font-size: 12.5px; font-weight: 590; letter-spacing: -.05px; cursor: pointer; background: light-dark(#1c1c1e, #f2f2f7); color: light-dark(#fbfbfd, #16161a); transition: transform 150ms cubic-bezier(.34,1.30,.64,1), opacity 150ms ease-out" style-hover="opacity: .86" style-active="transform: scale(.97)">Połącz z Vercelem</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isOffline }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 30px 24px; text-align: center">
+        <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" style="color: light-dark(rgba(60,60,67,.34), rgba(235,235,245,.34))"><path d="M1.6 5.4a9.2 9.2 0 0 1 12.8 0"></path><path d="M4.1 8a5.8 5.8 0 0 1 7.8 0"></path><path d="M6.4 10.5a2.6 2.6 0 0 1 3.2 0"></path><path d="M8 13.1h.01"></path><path d="M1.5 1.5 14.5 14.5"></path></svg>
+        <div style="font-size: 12.5px; line-height: 1.45; max-width: 236px; text-wrap: pretty; color: light-dark(rgba(60,60,67,.72), rgba(235,235,245,.68))">Brak połączenia z internetem. Wznowię monitorowanie automatycznie.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showFooter }}" hint-placeholder-val="{{ true }}">
+      <div style="height: .5px; background: light-dark(rgba(0,0,0,.09), rgba(255,255,255,.09))"></div>
+      <div style="display: flex; align-items: center; gap: 2px; padding: 5px 7px 6px">
+        <div style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 6px; font-size: 11px; letter-spacing: -.02px; cursor: default; color: light-dark(rgba(60,60,67,.72), rgba(235,235,245,.68)); transition: background 120ms ease-out" style-hover="background: light-dark(rgba(0,0,0,.05), rgba(255,255,255,.07))">
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12.1 7a5.1 5.1 0 1 1-1.6-3.7"></path><path d="M12.4 1.7v2.7H9.7"></path></svg>
+          Odśwież
+        </div>
+        <div style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 6px; font-size: 11px; letter-spacing: -.02px; cursor: default; color: light-dark(rgba(60,60,67,.72), rgba(235,235,245,.68)); transition: background 120ms ease-out" style-hover="background: light-dark(rgba(0,0,0,.05), rgba(255,255,255,.07))">
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="7" cy="7" r="2.5"></circle><path d="M7 1.3v1.7M7 11v1.7M1.3 7H3M11 7h1.7M2.95 2.95l1.2 1.2M9.85 9.85l1.2 1.2M11.05 2.95l-1.2 1.2M4.15 9.85l-1.2 1.2"></path></svg>
+          Ustawienia
+        </div>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 6px; font-size: 11px; letter-spacing: -.02px; cursor: default; color: light-dark(rgba(60,60,67,.72), rgba(235,235,245,.68)); transition: background 120ms ease-out" style-hover="background: light-dark(rgba(0,0,0,.05), rgba(255,255,255,.07))">
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M7 1.6v5.2"></path><path d="M3.9 3.5a4.6 4.6 0 1 0 6.2 0"></path></svg>
+          Zakończ
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ isDemo }}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 340px">
+      <div style="padding: 4px 10px; border-radius: 6px; font-size: 10.5px; font-weight: 590; cursor: pointer; user-select: none; background: light-dark(rgba(0,0,0,.06), rgba(255,255,255,.09)); color: light-dark(#1c1c1e, #f2f2f7); transition: transform 150ms cubic-bezier(.34,1.30,.64,1)" style-hover="background: light-dark(rgba(0,0,0,.10), rgba(255,255,255,.14))" style-active="transform: scale(.96)" onClick="{{ runSequence }}">Sekwencja: Queued → Building → Ready</div>
+      <div style="padding: 4px 10px; border-radius: 6px; font-size: 10.5px; font-weight: 590; cursor: pointer; user-select: none; background: light-dark(rgba(0,0,0,.06), rgba(255,255,255,.09)); color: light-dark(#1c1c1e, #f2f2f7); transition: transform 150ms cubic-bezier(.34,1.30,.64,1)" style-hover="background: light-dark(rgba(0,0,0,.10), rgba(255,255,255,.14))" style-active="transform: scale(.96)" onClick="{{ toggleRow }}">{{ rowBtn }}</div>
+      <div style="padding: 4px 10px; border-radius: 6px; font-size: 10.5px; font-weight: 590; cursor: pointer; user-select: none; background: {{ rmBg }}; color: {{ rmFg }}; transition: transform 150ms cubic-bezier(.34,1.30,.64,1)" style-active="transform: scale(.96)" onClick="{{ toggleReduced }}">Ogranicz ruch: {{ rmLabel }}</div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:380,&quot;height&quot;:400},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ready&quot;,&quot;building&quot;,&quot;error&quot;,&quot;onboarding&quot;,&quot;offline&quot;,&quot;demo&quot;],&quot;default&quot;:&quot;ready&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;headline&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Wszystko wdrożone&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;refreshed&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;odświeżono 12:04&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;reducedMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const S = {
+  ready:    { badge: 'Ready',    fg: 'light-dark(#1d7f38, #30d158)', bg: 'light-dark(rgba(29,127,56,.10), rgba(48,209,88,.15))' },
+  building: { badge: 'Building', fg: 'light-dark(#0064e0, #0a84ff)', bg: 'light-dark(rgba(0,100,224,.10), rgba(10,132,255,.17))' },
+  error:    { badge: 'Error',    fg: 'light-dark(#d70015, #ff453a)', bg: 'light-dark(rgba(215,0,21,.09), rgba(255,69,58,.17))' },
+  queued:   { badge: 'Queued',   fg: 'light-dark(#6e6e73, #98989d)', bg: 'light-dark(rgba(60,60,67,.08), rgba(235,235,245,.11))' }
+};
+const NEUTRAL_HOVER = 'light-dark(rgba(0,0,0,.045), rgba(255,255,255,.065))';
+
+const DATA = {
+  ready: [
+    ['mój-projekt', 'ready', 'main', 'popraw nagłówki cache dla /api', '2 min temu'],
+    ['sklep-online', 'ready', 'main', 'podsumowanie zamówienia w koszyku', '18 min temu'],
+    ['blog-firmowy', 'ready', 'main', 'aktualizacja zależności MDX', '1 godz. temu'],
+    ['panel-admin', 'ready', 'main', 'nowy widok listy użytkowników', '3 godz. temu'],
+    ['landing-2026', 'ready', 'main', 'sekcja z cenami bez pakietu Team', 'wczoraj']
+  ],
+  building: [
+    ['sklep-online', 'building', 'feat/koszyk', 'dodaj podsumowanie zamówienia', 'teraz'],
+    ['landing-2026', 'queued', 'main', 'sekcja z cenami bez pakietu Team', '40 s temu'],
+    ['mój-projekt', 'ready', 'main', 'popraw nagłówki cache dla /api', '6 min temu'],
+    ['blog-firmowy', 'ready', 'main', 'aktualizacja zależności MDX', '1 godz. temu'],
+    ['panel-admin', 'ready', 'main', 'nowy widok listy użytkowników', '3 godz. temu']
+  ],
+  error: [
+    ['panel-admin', 'error', 'fix/auth', 'zamień token na sesję po stronie serwera', '3 min temu'],
+    ['mój-projekt', 'ready', 'main', 'popraw nagłówki cache dla /api', '12 min temu'],
+    ['sklep-online', 'ready', 'feat/koszyk', 'dodaj podsumowanie zamówienia', '25 min temu'],
+    ['blog-firmowy', 'ready', 'main', 'aktualizacja zależności MDX', '1 godz. temu'],
+    ['landing-2026', 'queued', 'main', 'sekcja z cenami bez pakietu Team', '1 godz. temu']
+  ],
+  demo: [
+    ['mój-projekt', null, 'feat/koszyk', 'przenieś checkout na server actions', 'teraz'],
+    ['sklep-online', 'ready', 'main', 'podsumowanie zamówienia w koszyku', '9 min temu'],
+    ['blog-firmowy', 'ready', 'main', 'aktualizacja zależności MDX', '1 godz. temu', 41]
+  ]
+};
+
+const fmt = (s) => s < 60 ? s + ' s' : Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0') + ' s';
+const DUR = { 'mój-projekt': 38, 'sklep-online': 74, 'blog-firmowy': 41, 'panel-admin': 126, 'landing-2026': 52 };
+
+class Component extends DCLogic {
+  state = { demoStatus: 'building', prev: null, flash: false, extra: false, reduced: false, secs: 0, finalSecs: null };
+
+  componentDidMount() {
+    const v = this.props.variant || 'ready';
+    if (v !== 'building' && v !== 'demo') return;
+    this.tick = setInterval(() => this.setState(s => {
+      if (v === 'demo' && (s.demoStatus !== 'building' || s.secs > 240)) return null;
+      return { secs: s.secs + 1 };
+    }), v === 'demo' ? 220 : 1000);
+  }
+
+  componentWillUnmount() { (this.timers || []).forEach(clearTimeout); clearInterval(this.tick); }
+
+  later(fn, ms) { (this.timers = this.timers || []).push(setTimeout(fn, ms)); }
+
+  setStatus(next, opts) {
+    const cur = this.state.demoStatus;
+    this.setState(s => ({ demoStatus: next, prev: this.reduced() ? null : cur, finalSecs: next === 'ready' ? s.secs : null }));
+    if (!this.reduced()) this.later(() => this.setState({ prev: null }), 200);
+    if (opts && opts.flash && !this.reduced()) {
+      this.setState({ flash: false });
+      this.later(() => this.setState({ flash: true }), 20);
+      this.later(() => this.setState({ flash: false }), 500);
+    }
+  }
+
+  reduced() { return !!(this.props.reducedMotion || this.state.reduced); }
+
+  renderVals() {
+    const variant = this.props.variant || 'ready';
+    const reduced = this.reduced();
+    const isDemo = variant === 'demo';
+    const rows = (DATA[variant] || DATA.ready).slice();
+
+    const items = rows.map((r, i) => {
+      const status = r[1] || this.state.demoStatus;
+      const s = S[status] || S.queued;
+      const isErr = status === 'error';
+      const showBar = status === 'building';
+      const prev = isDemo && i === 0 && this.state.prev ? S[this.state.prev] : null;
+      const live = isDemo && i === 0;
+      const dur = status === 'ready' ? fmt(live ? (this.state.finalSecs || this.state.secs) : (DUR[r[0]] || 60))
+        : status === 'error' ? '48 s'
+        : status === 'building' ? fmt((live ? 0 : 64) + this.state.secs)
+        : null;
+      return {
+        name: r[0], branch: r[2], commit: r[3], time: r[4], dur,
+        badge: s.badge, badgeFg: s.fg, badgeBg: s.bg,
+        badgeAnim: prev ? 'vb-badge-in 180ms cubic-bezier(.34,1.30,.64,1)' : 'none',
+        prevBadge: prev ? prev.badge : null, prevFg: prev ? prev.fg : '', prevBg: prev ? prev.bg : '',
+        building: showBar,
+        rowBg: isErr ? 'light-dark(rgba(215,0,21,.055), rgba(255,69,58,.085))' : 'transparent',
+        rowHover: isErr ? 'light-dark(rgba(215,0,21,.085), rgba(255,69,58,.13))' : NEUTRAL_HOVER,
+        rowRing: isErr ? 'inset 0 0 0 .5px light-dark(rgba(215,0,21,.20), rgba(255,69,58,.24))' : 'none',
+        anim: (isDemo && i === 0 && this.state.flash) ? 'vb-flash 420ms cubic-bezier(.34,1.30,.64,1)' : 'none',
+        gt: '1fr', o: 1
+      };
+    });
+
+    if (isDemo) {
+      items.push({
+        name: 'panel-admin', branch: 'fix/auth', commit: 'zamień token na sesję po stronie serwera', time: 'teraz', dur: null,
+        badge: S.queued.badge, badgeFg: S.queued.fg, badgeBg: S.queued.bg, badgeAnim: 'none',
+        prevBadge: null, prevFg: '', prevBg: '', building: false,
+        rowBg: 'transparent', rowHover: NEUTRAL_HOVER, rowRing: 'none', anim: 'none',
+        gt: this.state.extra ? '1fr' : '0fr', o: this.state.extra ? 1 : 0
+      });
+    }
+
+    const dot = {
+      ready: 'light-dark(#1d7f38, #30d158)', building: 'light-dark(#0064e0, #0a84ff)',
+      error: 'light-dark(#d70015, #ff453a)', offline: 'light-dark(#8e8e93, #98989d)'
+    };
+    const headStatus = isDemo ? (this.state.demoStatus === 'ready' ? 'ready' : this.state.demoStatus) : variant;
+    const dotColor = dot[headStatus] || dot.ready;
+    const pulsing = headStatus === 'building' && !reduced;
+
+    return {
+      items,
+      hasRows: variant !== 'onboarding' && variant !== 'offline',
+      isOnboarding: variant === 'onboarding',
+      isOffline: variant === 'offline',
+      showHeader: variant !== 'onboarding',
+      showFooter: variant !== 'onboarding',
+      isDemo,
+      headline: this.props.headline || (isDemo ? (this.state.demoStatus === 'building' ? 'Build w toku…' : this.state.demoStatus === 'ready' ? 'Wszystko wdrożone' : '1 deploy w kolejce') : 'Wszystko wdrożone'),
+      refreshed: this.props.refreshed || 'odświeżono 12:04',
+      dotColor,
+      dotAnim: pulsing ? 'vb-pulse 1.1s ease-in-out infinite' : 'none',
+      barAnim: reduced ? 'none' : 'vb-bar 1.5s cubic-bezier(.45,0,.55,1) infinite',
+      rowBtn: this.state.extra ? 'Usuń wiersz' : 'Dodaj wiersz',
+      rmLabel: reduced ? 'wł.' : 'wył.',
+      rmBg: reduced ? 'light-dark(#1c1c1e, #f2f2f7)' : 'light-dark(rgba(0,0,0,.06), rgba(255,255,255,.09))',
+      rmFg: reduced ? 'light-dark(#fbfbfd, #16161a)' : 'light-dark(#1c1c1e, #f2f2f7)',
+      toggleRow: () => this.setState(s => ({ extra: !s.extra })),
+      toggleReduced: () => this.setState(s => ({ reduced: !s.reduced })),
+      runSequence: () => {
+        (this.timers || []).forEach(clearTimeout); this.timers = [];
+        this.setState({ demoStatus: 'queued', prev: null, flash: false, secs: 0, finalSecs: null });
+        this.later(() => this.setStatus('building'), 700);
+        this.later(() => this.setStatus('ready', { flash: true }), 2600);
+      }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

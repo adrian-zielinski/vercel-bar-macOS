@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
+body { margin: 0; background: #e9e9ea; -webkit-font-smoothing: antialiased; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif }
+a { color: #0064e0; text-decoration: none }
+a:hover { color: #1c1c1e }
+</style>
+</helmet>
+<div style="width: 1560px; box-sizing: border-box; padding: 56px 28px 80px; display: flex; flex-direction: column; gap: 56px; color-scheme: light; background: #e9e9ea; color: #1c1c1e; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased">
+
+  <section data-screen-label="00 Intro" style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px">
+    <div style="display: flex; flex-direction: column; gap: 10px; max-width: 640px">
+      <div style="display: flex; align-items: center; gap: 11px">
+        <svg width="19" height="17" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#1c1c1e"></path></svg>
+        <div style="font-size: 30px; font-weight: 620; letter-spacing: -.8px">VercelBar</div>
+      </div>
+      <div style="font-size: 13.5px; line-height: 1.5; text-wrap: pretty; color: rgba(60,60,67,.62)">Aplikacja paska menu macOS do podglądu deployów. Czerń i biel, jeden kolor akcentu na stan, natywne materiały okien. Każdy ekran w wersji jasnej i ciemnej.</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 9px; align-items: flex-end">
+      <div style="display: flex; gap: 6px">
+        <div style="padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 620; background: rgba(29,127,56,.10); color: #1d7f38">Ready</div>
+        <div style="padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 620; background: rgba(0,100,224,.10); color: #0064e0">Building</div>
+        <div style="padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 620; background: rgba(215,0,21,.09); color: #d70015">Error</div>
+        <div style="padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 620; background: rgba(60,60,67,.08); color: #6e6e73">Queued</div>
+      </div>
+      <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; line-height: 1.7; text-align: right; color: rgba(60,60,67,.45)">SF Pro Text 10–13 px &nbsp;/&nbsp; SF Mono dla gałęzi<br>promień 12 px popover, 10 px okno, 7 px wiersz<br>materiał: blur 40 px + saturate 180 %</div>
+    </div>
+  </section>
+
+  <section data-screen-label="01 Popover" style="display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: .5px; color: rgba(60,60,67,.38)">01</div>
+      <div style="font-size: 19px; font-weight: 600; letter-spacing: -.3px">Popover paska menu</div>
+      <div style="font-size: 12.5px; color: rgba(60,60,67,.5)">340 px · stan zbiorczy, pięć projektów, trzy akcje w stopce</div>
+    </div>
+    <div style="display: flex; gap: 24px">
+      <div style="flex: 1; position: relative; padding: 34px 0 40px; display: flex; justify-content: center; border-radius: 16px; color-scheme: light; background: #cbced4; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0 14px, rgba(0,0,0,.025) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(0,0,0,.07)">
+        <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(0,0,0,.34)">JASNY</div>
+        <dc-import name="VercelBar Popover" variant="ready" headline="Wszystko wdrożone" refreshed="odświeżono 12:04" reduced-motion="{{ reducedMotion }}" hint-size="340px,330px"></dc-import>
+      </div>
+      <sc-if value="{{ showDark }}" hint-placeholder-val="{{ true }}">
+        <div style="flex: 1; position: relative; padding: 34px 0 40px; display: flex; justify-content: center; border-radius: 16px; color-scheme: dark; background: #16171a; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 14px, rgba(0,0,0,.10) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.07)">
+          <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(255,255,255,.32)">CIEMNY</div>
+          <dc-import name="VercelBar Popover" variant="ready" headline="Wszystko wdrożone" refreshed="odświeżono 12:04" reduced-motion="{{ reducedMotion }}" hint-size="340px,330px"></dc-import>
+        </div>
+      </sc-if>
+    </div>
+  </section>
+
+  <section data-screen-label="02 Warianty" style="display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: .5px; color: rgba(60,60,67,.38)">02</div>
+      <div style="font-size: 19px; font-weight: 600; letter-spacing: -.3px">Warianty popovera</div>
+      <div style="font-size: 12.5px; color: rgba(60,60,67,.5)">build w toku · deploy z błędem · onboarding · offline</div>
+    </div>
+    <div style="position: relative; padding: 34px 28px 26px; border-radius: 16px; color-scheme: light; background: #cbced4; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0 14px, rgba(0,0,0,.025) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(0,0,0,.07)">
+      <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(0,0,0,.34)">JASNY</div>
+      <div style="display: flex; gap: 24px; align-items: flex-start">
+        <div style="display: flex; flex-direction: column; gap: 11px; align-items: flex-start">
+          <dc-import name="VercelBar Popover" variant="building" headline="Build w toku…" refreshed="odświeżono 12:04" reduced-motion="{{ reducedMotion }}" hint-size="340px,340px"></dc-import>
+          <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; line-height: 1.6; color: rgba(0,0,0,.42)">BUILD W TOKU — pulsująca kropka,<br>cienki pasek postępu w wierszu</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 11px; align-items: flex-start">
+          <dc-import name="VercelBar Popover" variant="error" headline="1 deploy padł" refreshed="odświeżono 12:04" reduced-motion="{{ reducedMotion }}" hint-size="340px,340px"></dc-import>
+          <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; line-height: 1.6; color: rgba(0,0,0,.42)">BŁĄD — tło 5,5 % czerwieni,<br>obwódka 0,5 px, badge Error</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 11px; align-items: flex-start">
+          <dc-import name="VercelBar Popover" variant="onboarding" hint-size="340px,190px"></dc-import>
+          <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; line-height: 1.6; color: rgba(0,0,0,.42)">ONBOARDING — bez nagłówka i stopki,<br>jedno zdanie i czarny przycisk</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 11px; align-items: flex-start">
+          <dc-import name="VercelBar Popover" variant="offline" headline="Brak połączenia" refreshed="12:04" hint-size="340px,190px"></dc-import>
+          <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; line-height: 1.6; color: rgba(0,0,0,.42)">OFFLINE — szara kropka, wifi.slash,<br>stopka zostaje dla „Odśwież”</div>
+        </div>
+      </div>
+    </div>
+    <sc-if value="{{ showDark }}" hint-placeholder-val="{{ true }}">
+      <div style="position: relative; padding: 34px 28px 26px; border-radius: 16px; color-scheme: dark; background: #16171a; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 14px, rgba(0,0,0,.10) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.07)">
+        <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(255,255,255,.32)">CIEMNY</div>
+        <div style="display: flex; gap: 24px; align-items: flex-start">
+          <dc-import name="VercelBar Popover" variant="building" headline="Build w toku…" refreshed="odświeżono 12:04" reduced-motion="{{ reducedMotion }}" hint-size="340px,340px"></dc-import>
+          <dc-import name="VercelBar Popover" variant="error" headline="1 deploy padł" refreshed="odświeżono 12:04" reduced-motion="{{ reducedMotion }}" hint-size="340px,340px"></dc-import>
+          <dc-import name="VercelBar Popover" variant="onboarding" hint-size="340px,190px"></dc-import>
+          <dc-import name="VercelBar Popover" variant="offline" headline="Brak połączenia" refreshed="12:04" hint-size="340px,190px"></dc-import>
+        </div>
+      </div>
+    </sc-if>
+  </section>
+
+  <section data-screen-label="03 Ustawienia" style="display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: .5px; color: rgba(60,60,67,.38)">03</div>
+      <div style="font-size: 19px; font-weight: 600; letter-spacing: -.3px">Okno ustawień</div>
+      <div style="font-size: 12.5px; color: rgba(60,60,67,.5)">480 × 380 px · zakładki Konto i Projekty, przełączniki w stopce (zakładki są klikalne)</div>
+    </div>
+    <div style="position: relative; padding: 40px 0; display: flex; justify-content: center; gap: 36px; border-radius: 16px; color-scheme: light; background: #cbced4; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0 14px, rgba(0,0,0,.025) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(0,0,0,.07)">
+      <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(0,0,0,.34)">JASNY</div>
+      <dc-import name="VercelBar Settings" tab="konto" hint-size="480px,380px"></dc-import>
+      <dc-import name="VercelBar Settings" tab="projekty" hint-size="480px,380px"></dc-import>
+    </div>
+    <sc-if value="{{ showDark }}" hint-placeholder-val="{{ true }}">
+      <div style="position: relative; padding: 40px 0; display: flex; justify-content: center; gap: 36px; border-radius: 16px; color-scheme: dark; background: #16171a; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 14px, rgba(0,0,0,.10) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.07)">
+        <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(255,255,255,.32)">CIEMNY</div>
+        <dc-import name="VercelBar Settings" tab="konto" hint-size="480px,380px"></dc-import>
+        <dc-import name="VercelBar Settings" tab="projekty" hint-size="480px,380px"></dc-import>
+      </div>
+    </sc-if>
+  </section>
+
+  <section data-screen-label="04 Ikona paska menu" style="display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: .5px; color: rgba(60,60,67,.38)">04</div>
+      <div style="font-size: 19px; font-weight: 600; letter-spacing: -.3px">Ikona paska menu</div>
+      <div style="font-size: 12.5px; color: rgba(60,60,67,.5)">trójkąt 15 × 13 px, jeden kolor na stan · pasek menu 26 px</div>
+    </div>
+
+    <div style="position: relative; border-radius: 16px; overflow: hidden; color-scheme: light; background: #cbced4; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0 14px, rgba(0,0,0,.025) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(0,0,0,.07)">
+      <div style="height: 26px; display: flex; align-items: center; gap: 18px; padding: 0 16px; background: rgba(255,255,255,.62); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); font-size: 12.5px; color: #1c1c1e">
+        <div style="font-weight: 620">Finder</div>
+        <div style="display: flex; gap: 17px; color: rgba(28,28,30,.9)">
+          <div>Plik</div><div>Edycja</div><div>Widok</div><div>Idź</div><div>Okno</div><div>Pomoc</div>
+        </div>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 14px">
+          <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#1d7f38"></path></svg>
+          <div style="font-size: 12.5px">Pn 6 sie 12:04</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 20px; padding: 26px 16px 24px">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+          <div style="height: 26px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 12px; border-radius: 7px; background: rgba(255,255,255,.62); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%)">
+            <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#1d7f38"></path></svg>
+            <div style="font-size: 12.5px; color: #1c1c1e">12:04</div>
+          </div>
+          <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; color: rgba(0,0,0,.45)">READY · #1D7F38</div>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+          <div style="height: 26px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 12px; border-radius: 7px; background: rgba(255,255,255,.62); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%)">
+            <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#0064e0"></path></svg>
+            <div style="font-size: 12.5px; color: #1c1c1e">12:04</div>
+          </div>
+          <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; color: rgba(0,0,0,.45)">BUILDING · #0064E0</div>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+          <div style="height: 26px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 12px; border-radius: 7px; background: rgba(255,255,255,.62); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%)">
+            <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#d70015"></path></svg>
+            <div style="font-size: 12.5px; color: #1c1c1e">12:04</div>
+          </div>
+          <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; color: rgba(0,0,0,.45)">ERROR · #D70015</div>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+          <div style="height: 26px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 12px; border-radius: 7px; background: rgba(255,255,255,.62); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%)">
+            <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#8e8e93"></path></svg>
+            <div style="font-size: 12.5px; color: #1c1c1e">12:04</div>
+          </div>
+          <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; color: rgba(0,0,0,.45)">QUEUED · #8E8E93</div>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{ showDark }}" hint-placeholder-val="{{ true }}">
+      <div style="position: relative; border-radius: 16px; overflow: hidden; color-scheme: dark; background: #16171a; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 14px, rgba(0,0,0,.10) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.07)">
+        <div style="height: 26px; display: flex; align-items: center; gap: 18px; padding: 0 16px; background: rgba(30,30,32,.66); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); font-size: 12.5px; color: #f2f2f7">
+          <div style="font-weight: 620">Finder</div>
+          <div style="display: flex; gap: 17px; color: rgba(242,242,247,.88)">
+            <div>Plik</div><div>Edycja</div><div>Widok</div><div>Idź</div><div>Okno</div><div>Pomoc</div>
+          </div>
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 14px">
+            <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#30d158"></path></svg>
+            <div style="font-size: 12.5px">Pn 6 sie 12:04</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 20px; padding: 26px 16px 24px">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+            <div style="height: 26px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 12px; border-radius: 7px; background: rgba(30,30,32,.66); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%)">
+              <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#30d158"></path></svg>
+              <div style="font-size: 12.5px; color: #f2f2f7">12:04</div>
+            </div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; color: rgba(255,255,255,.42)">READY · #30D158</div>
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+            <div style="height: 26px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 12px; border-radius: 7px; background: rgba(30,30,32,.66); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%)">
+              <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#0a84ff"></path></svg>
+              <div style="font-size: 12.5px; color: #f2f2f7">12:04</div>
+            </div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; color: rgba(255,255,255,.42)">BUILDING · #0A84FF</div>
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+            <div style="height: 26px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 12px; border-radius: 7px; background: rgba(30,30,32,.66); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%)">
+              <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#ff453a"></path></svg>
+              <div style="font-size: 12.5px; color: #f2f2f7">12:04</div>
+            </div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; color: rgba(255,255,255,.42)">ERROR · #FF453A</div>
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+            <div style="height: 26px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 12px; border-radius: 7px; background: rgba(30,30,32,.66); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%)">
+              <svg width="15" height="13" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#98989d"></path></svg>
+              <div style="font-size: 12.5px; color: #f2f2f7">12:04</div>
+            </div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; color: rgba(255,255,255,.42)">QUEUED · #98989D</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+  </section>
+
+  <section data-screen-label="05 Powiadomienia" style="display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: .5px; color: rgba(60,60,67,.38)">05</div>
+      <div style="font-size: 19px; font-weight: 600; letter-spacing: -.3px">Powiadomienia systemowe</div>
+      <div style="font-size: 12.5px; color: rgba(60,60,67,.5)">344 px · promień 16 px, ikona aplikacji 38 px</div>
+    </div>
+    <div style="display: flex; gap: 24px">
+      <div style="flex: 1; position: relative; padding: 34px 0 36px; display: flex; flex-direction: column; align-items: center; gap: 14px; border-radius: 16px; color-scheme: light; background: #cbced4; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0 14px, rgba(0,0,0,.025) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(0,0,0,.07)">
+        <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(0,0,0,.34)">JASNY</div>
+        <div style="width: 344px; box-sizing: border-box; display: flex; gap: 11px; padding: 12px 13px; border-radius: 16px; background: rgba(250,250,250,.78); backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); box-shadow: 0 0 0 .5px rgba(0,0,0,.08), 0 8px 26px rgba(0,0,0,.14)">
+          <div style="width: 38px; height: 38px; flex: none; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: #1c1c1e"><svg width="17" height="15" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#ffffff"></path></svg></div>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+            <div style="display: flex; align-items: baseline; gap: 8px">
+              <div style="flex: 1; font-size: 13px; font-weight: 590; letter-spacing: -.1px; color: #1c1c1e">❌ mój-projekt: deploy padł</div>
+              <div style="flex: none; font-size: 10.5px; color: rgba(60,60,67,.45)">teraz</div>
+            </div>
+            <div style="font-size: 12.5px; line-height: 1.35; color: rgba(60,60,67,.68)">fix/auth · build przerwany po 48 s. Kliknij, aby otworzyć logi.</div>
+          </div>
+        </div>
+        <div style="width: 344px; box-sizing: border-box; display: flex; gap: 11px; padding: 12px 13px; border-radius: 16px; background: rgba(250,250,250,.78); backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); box-shadow: 0 0 0 .5px rgba(0,0,0,.08), 0 8px 26px rgba(0,0,0,.14)">
+          <div style="width: 38px; height: 38px; flex: none; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: #1c1c1e"><svg width="17" height="15" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#ffffff"></path></svg></div>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+            <div style="display: flex; align-items: baseline; gap: 8px">
+              <div style="flex: 1; font-size: 13px; font-weight: 590; letter-spacing: -.1px; color: #1c1c1e">✅ mój-projekt wdrożony</div>
+              <div style="flex: none; font-size: 10.5px; color: rgba(60,60,67,.45)">teraz</div>
+            </div>
+            <div style="font-size: 12.5px; line-height: 1.35; color: rgba(60,60,67,.68)">main · gotowe w 38 s. Kliknij, aby otworzyć podglądowy adres.</div>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ showDark }}" hint-placeholder-val="{{ true }}">
+        <div style="flex: 1; position: relative; padding: 34px 0 36px; display: flex; flex-direction: column; align-items: center; gap: 14px; border-radius: 16px; color-scheme: dark; background: #16171a; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 14px, rgba(0,0,0,.10) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.07)">
+          <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(255,255,255,.32)">CIEMNY</div>
+          <div style="width: 344px; box-sizing: border-box; display: flex; gap: 11px; padding: 12px 13px; border-radius: 16px; background: rgba(40,40,43,.74); backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); box-shadow: 0 0 0 .5px rgba(255,255,255,.10), 0 10px 30px rgba(0,0,0,.5)">
+            <div style="width: 38px; height: 38px; flex: none; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: #f2f2f7"><svg width="17" height="15" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#16161a"></path></svg></div>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+              <div style="display: flex; align-items: baseline; gap: 8px">
+                <div style="flex: 1; font-size: 13px; font-weight: 590; letter-spacing: -.1px; color: #f2f2f7">❌ mój-projekt: deploy padł</div>
+                <div style="flex: none; font-size: 10.5px; color: rgba(235,235,245,.42)">teraz</div>
+              </div>
+              <div style="font-size: 12.5px; line-height: 1.35; color: rgba(235,235,245,.64)">fix/auth · build przerwany po 48 s. Kliknij, aby otworzyć logi.</div>
+            </div>
+          </div>
+          <div style="width: 344px; box-sizing: border-box; display: flex; gap: 11px; padding: 12px 13px; border-radius: 16px; background: rgba(40,40,43,.74); backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); box-shadow: 0 0 0 .5px rgba(255,255,255,.10), 0 10px 30px rgba(0,0,0,.5)">
+            <div style="width: 38px; height: 38px; flex: none; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: #f2f2f7"><svg width="17" height="15" viewBox="0 0 26 23"><path d="M13 1 25.5 22H.5Z" fill="#16161a"></path></svg></div>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+              <div style="display: flex; align-items: baseline; gap: 8px">
+                <div style="flex: 1; font-size: 13px; font-weight: 590; letter-spacing: -.1px; color: #f2f2f7">✅ mój-projekt wdrożony</div>
+                <div style="flex: none; font-size: 10.5px; color: rgba(235,235,245,.42)">teraz</div>
+              </div>
+              <div style="font-size: 12.5px; line-height: 1.35; color: rgba(235,235,245,.64)">main · gotowe w 38 s. Kliknij, aby otworzyć podglądowy adres.</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </section>
+
+  <section data-screen-label="06 Animacje" style="display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: .5px; color: rgba(60,60,67,.38)">06</div>
+      <div style="font-size: 19px; font-weight: 600; letter-spacing: -.3px">Animacje</div>
+      <div style="font-size: 12.5px; color: rgba(60,60,67,.5)">żywe demo — uruchom sekwencję, dodaj wiersz, najedź na wiersz</div>
+    </div>
+    <div style="display: flex; gap: 24px">
+      <div style="flex: 1; position: relative; padding: 34px 0 32px; display: flex; justify-content: center; border-radius: 16px; color-scheme: light; background: #cbced4; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0 14px, rgba(0,0,0,.025) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(0,0,0,.07)">
+        <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(0,0,0,.34)">JASNY</div>
+        <dc-import name="VercelBar Popover" variant="demo" refreshed="odświeżono teraz" reduced-motion="{{ reducedMotion }}" hint-size="340px,330px"></dc-import>
+      </div>
+      <sc-if value="{{ showDark }}" hint-placeholder-val="{{ true }}">
+        <div style="flex: 1; position: relative; padding: 34px 0 32px; display: flex; justify-content: center; border-radius: 16px; color-scheme: dark; background: #16171a; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 14px, rgba(0,0,0,.10) 14px 28px); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.07)">
+          <div style="position: absolute; left: 16px; top: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 1px; color: rgba(255,255,255,.32)">CIEMNY</div>
+          <dc-import name="VercelBar Popover" variant="demo" refreshed="odświeżono teraz" reduced-motion="{{ reducedMotion }}" hint-size="340px,330px"></dc-import>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-top: 8px">
+        <div style="display: flex; gap: 16px; padding: 14px 0; border-top: .5px solid rgba(0,0,0,.10)">
+          <div style="width: 168px; flex: none; font-size: 12.5px; font-weight: 590; letter-spacing: -.05px">Pulsowanie kropki</div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <div style="font-size: 12.5px; line-height: 1.45; color: rgba(60,60,67,.68)">Kropka „Building” pulsuje w pętli: skala 1 → 1,15 i opacity 0,55 → 1. Zatrzymuje się w tej samej ramce, w której status przestaje być Building.</div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; color: rgba(60,60,67,.45)">1100 ms · ease-in-out · infinite</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 16px; padding: 14px 0; border-top: .5px solid rgba(0,0,0,.10)">
+          <div style="width: 168px; flex: none; font-size: 12.5px; font-weight: 590; letter-spacing: -.05px">Crossfade badge’a</div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <div style="font-size: 12.5px; line-height: 1.45; color: rgba(60,60,67,.68)">Oba badge’e leżą w tej samej komórce siatki: nowy wchodzi opacity 0 → 1 ze skalą 0,94 → 1, stary wychodzi 1 → 0. Wiersz nie drga, bo szerokość bierze większy z dwóch.</div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; color: rgba(60,60,67,.45)">180 ms · cubic-bezier(.34, 1.30, .64, 1)</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 16px; padding: 14px 0; border-top: .5px solid rgba(0,0,0,.10)">
+          <div style="width: 168px; flex: none; font-size: 12.5px; font-weight: 590; letter-spacing: -.05px">Wysokość popovera</div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <div style="font-size: 12.5px; line-height: 1.45; color: rgba(60,60,67,.68)">Każdy wiersz to siatka 0fr → 1fr, więc dochodzące i znikające wiersze rozsuwają popover bez skoku. Okno natywne animuje ramkę tą samą krzywą.</div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; color: rgba(60,60,67,.45)">220 ms · cubic-bezier(.34, 1.30, .64, 1)</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 16px; padding: 14px 0; border-top: .5px solid rgba(0,0,0,.10)">
+          <div style="width: 168px; flex: none; font-size: 12.5px; font-weight: 590; letter-spacing: -.05px">Rozbłysk Building → Ready</div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <div style="font-size: 12.5px; line-height: 1.45; color: rgba(60,60,67,.68)">Tło wiersza dochodzi do 16 % zieleni w pierwszych 120 ms i wraca do zera. Bez obramowania i bez cienia — tylko tło.</div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; color: rgba(60,60,67,.45)">420 ms · cubic-bezier(.34, 1.30, .64, 1)</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 16px; padding: 14px 0; border-top: .5px solid rgba(0,0,0,.10)">
+          <div style="width: 168px; flex: none; font-size: 12.5px; font-weight: 590; letter-spacing: -.05px">Hover wiersza</div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <div style="font-size: 12.5px; line-height: 1.45; color: rgba(60,60,67,.68)">Tło 4,5 % czerni (6,5 % bieli w ciemnym), a strzałka „otwórz” wysuwa się z prawej: opacity 0 → 1 i translateX −6 → 0 px. Miejsce na strzałkę jest zarezerwowane, więc czas względny nie przeskakuje.</div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; color: rgba(60,60,67,.45)">tło 120 ms ease-out · strzałka 200 ms sprężysto</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 16px; padding: 14px 0; border-top: .5px solid rgba(0,0,0,.10)">
+          <div style="width: 168px; flex: none; font-size: 12.5px; font-weight: 590; letter-spacing: -.05px">Ogranicz ruch</div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <div style="font-size: 12.5px; line-height: 1.45; color: rgba(60,60,67,.68)">Przy systemowym „Ogranicz ruch” wszystkie animacje i przejścia są wyłączone: statusy zmieniają się natychmiast, kropka i pasek postępu stoją w pełnej opacity, wysokość zmienia się skokowo.</div>
+            <div style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; color: rgba(60,60,67,.45)">prefers-reduced-motion: reduce → 0 ms</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+  </section>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;reducedMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Podgląd&quot;},&quot;showDark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Podgląd&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Podgląd&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      reducedMotion: !!this.props.reducedMotion,
+      showDark: this.props.showDark !== false,
+      showNotes: this.props.showNotes !== false
+    };
+  }
+}
+
+</script>
+</body>
+</html>

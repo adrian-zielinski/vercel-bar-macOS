@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
+body { margin: 0; -webkit-font-smoothing: antialiased; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif }
+</style>
+</helmet>
+<div style="width: 480px; height: 380px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; background: light-dark(rgba(246,246,247,.90), rgba(32,32,34,.88)); backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); color: light-dark(#1c1c1e, #f2f2f7); box-shadow: 0 0 0 .5px light-dark(rgba(0,0,0,.14), rgba(255,255,255,.11)), 0 12px 34px light-dark(rgba(0,0,0,.16), rgba(0,0,0,.48))">
+
+  <div style="flex: none; display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 14px; border-bottom: .5px solid light-dark(rgba(0,0,0,.09), rgba(255,255,255,.08))">
+    <div style="display: flex; gap: 8px">
+      <div style="width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.10)"></div>
+      <div style="width: 12px; height: 12px; border-radius: 50%; background: light-dark(rgba(0,0,0,.10), rgba(255,255,255,.14))"></div>
+      <div style="width: 12px; height: 12px; border-radius: 50%; background: light-dark(rgba(0,0,0,.10), rgba(255,255,255,.14))"></div>
+    </div>
+    <div style="margin: 0 auto; display: flex; padding: 2px; border-radius: 8px; background: light-dark(rgba(0,0,0,.05), rgba(255,255,255,.07))">
+      <div style="padding: 3px 15px; border-radius: 6px; font-size: 12px; font-weight: 510; letter-spacing: -.05px; cursor: default; user-select: none; background: {{ kontoBg }}; box-shadow: {{ kontoRing }}; color: {{ kontoFg }}; transition: background 150ms ease-out" onClick="{{ showKonto }}">Konto</div>
+      <div style="padding: 3px 15px; border-radius: 6px; font-size: 12px; font-weight: 510; letter-spacing: -.05px; cursor: default; user-select: none; background: {{ projBg }}; box-shadow: {{ projRing }}; color: {{ projFg }}; transition: background 150ms ease-out" onClick="{{ showProjekty }}">Projekty</div>
+    </div>
+    <div style="width: 52px"></div>
+  </div>
+
+  <div style="flex: 1; min-height: 0; padding: 18px 22px 14px">
+
+    <sc-if value="{{ isKonto }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: flex-start; gap: 10px">
+          <div style="width: 104px; flex: none; padding-top: 5px; text-align: right; font-size: 12px; color: light-dark(rgba(60,60,67,.62), rgba(235,235,245,.60))">Token dostępu</div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 5px">
+            <div style="display: flex; gap: 7px">
+              <div style="flex: 1; height: 24px; display: flex; align-items: center; padding: 0 8px; border-radius: 6px; background: light-dark(#ffffff, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 .5px light-dark(rgba(0,0,0,.16), rgba(255,255,255,.12)); font-size: 12px; letter-spacing: 1px; color: light-dark(rgba(60,60,67,.75), rgba(235,235,245,.70))">••••••••••••••••••••</div>
+              <div style="flex: none; height: 24px; display: flex; align-items: center; padding: 0 11px; border-radius: 6px; font-size: 11.5px; font-weight: 510; cursor: default; background: light-dark(#ffffff, rgba(255,255,255,.09)); box-shadow: inset 0 0 0 .5px light-dark(rgba(0,0,0,.13), rgba(255,255,255,.10))" style-hover="background: light-dark(#f3f3f4, rgba(255,255,255,.14))">Zmień</div>
+            </div>
+            <div style="font-size: 10.5px; line-height: 1.4; color: light-dark(rgba(60,60,67,.45), rgba(235,235,245,.42))">Token z panelu Vercela → Account Settings → Tokens. Zakres: tylko odczyt.</div>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px">
+          <div style="width: 104px; flex: none; text-align: right; font-size: 12px; color: light-dark(rgba(60,60,67,.62), rgba(235,235,245,.60))">Połączenie</div>
+          <div style="flex: 1; display: flex; align-items: center; gap: 9px">
+            <div style="width: 26px; height: 26px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 620; letter-spacing: .2px; background: light-dark(rgba(0,0,0,.07), rgba(255,255,255,.12)); color: light-dark(rgba(60,60,67,.72), rgba(235,235,245,.68))">MK</div>
+            <div style="display: flex; flex-direction: column; gap: 1px">
+              <div style="font-size: 12.5px; font-weight: 590; letter-spacing: -.05px">Marta Kowalska</div>
+              <div style="display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: light-dark(#1d7f38, #30d158)">
+                <div style="width: 6px; height: 6px; border-radius: 50%; background: light-dark(#1d7f38, #30d158)"></div>
+                Połączono
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px">
+          <div style="width: 104px; flex: none; text-align: right; font-size: 12px; color: light-dark(rgba(60,60,67,.62), rgba(235,235,245,.60))">Zespół</div>
+          <div style="width: 196px; height: 24px; display: flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: 6px; cursor: default; background: light-dark(#ffffff, rgba(255,255,255,.09)); box-shadow: inset 0 0 0 .5px light-dark(rgba(0,0,0,.13), rgba(255,255,255,.10))" style-hover="background: light-dark(#f3f3f4, rgba(255,255,255,.14))">
+            <div style="flex: 1; font-size: 12px; letter-spacing: -.05px">Studio Nord</div>
+            <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: light-dark(rgba(60,60,67,.55), rgba(235,235,245,.55))"><path d="M1.6 3.6 5 7 8.4 3.6"></path></svg>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isProjekty }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <div style="flex: 1; min-width: 0; height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 6px; background: light-dark(#ffffff, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 .5px light-dark(rgba(0,0,0,.14), rgba(255,255,255,.11))">
+            <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color: light-dark(rgba(60,60,67,.45), rgba(235,235,245,.45))"><circle cx="6" cy="6" r="4.1"></circle><path d="M9.1 9.1 12.4 12.4"></path></svg>
+            <div style="font-size: 12px; color: light-dark(rgba(60,60,67,.42), rgba(235,235,245,.40))">Szukaj projektów</div>
+          </div>
+          <div style="flex: none; font-size: 10.5px; white-space: nowrap; color: light-dark(rgba(60,60,67,.45), rgba(235,235,245,.42))">{{ countLabel }}</div>
+        </div>
+        <div style="border-radius: 7px; overflow: hidden; background: light-dark(#ffffff, rgba(255,255,255,.05)); box-shadow: inset 0 0 0 .5px light-dark(rgba(0,0,0,.12), rgba(255,255,255,.09))">
+          <sc-for list="{{ projects }}" as="p" hint-placeholder-count="6">
+            <div style="display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 9px; border-top: {{ p.rule }}; transition: background 120ms ease-out" style-hover="background: light-dark(rgba(0,0,0,.035), rgba(255,255,255,.05))" onClick="{{ p.toggle }}">
+              <div style="width: 13px; height: 13px; flex: none; border-radius: 3.5px; display: flex; align-items: center; justify-content: center; background: {{ p.boxBg }}; box-shadow: {{ p.boxRing }}">
+                <sc-if value="{{ p.on }}" hint-placeholder-val="{{ true }}">
+                  <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 6.2 4.7 8.5 9.6 3.4"></path></svg>
+                </sc-if>
+              </div>
+              <div style="flex: 1; font-size: 12px; letter-spacing: -.05px; color: {{ p.fg }}">{{ p.name }}</div>
+              <div style="font-size: 10px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; color: light-dark(rgba(60,60,67,.40), rgba(235,235,245,.38))">{{ p.branch }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="flex: none; padding: 11px 22px 14px; border-top: .5px solid light-dark(rgba(0,0,0,.09), rgba(255,255,255,.08))">
+    <sc-for list="{{ toggles }}" as="t" hint-placeholder-count="3">
+      <div style="display: flex; align-items: center; gap: 10px; height: 27px">
+        <div style="flex: 1; font-size: 12px; letter-spacing: -.05px">{{ t.label }}</div>
+        <div style="width: 34px; height: 20px; flex: none; border-radius: 10px; padding: 2px; box-sizing: border-box; cursor: default; background: {{ t.trackBg }}; box-shadow: {{ t.trackRing }}; transition: background 180ms ease-out" onClick="{{ t.toggle }}">
+          <div style="width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.20); transform: translateX({{ t.knobX }}); transition: transform 200ms cubic-bezier(.34,1.30,.64,1)"></div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:520,&quot;height&quot;:420},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;konto&quot;,&quot;projekty&quot;],&quot;default&quot;:&quot;konto&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const PROJECTS = [
+  ['mój-projekt', 'main', true], ['sklep-online', 'feat/koszyk', true],
+  ['panel-admin', 'fix/auth', true], ['blog-firmowy', 'main', true],
+  ['landing-2026', 'main', false], ['api-gateway', 'main', false]
+];
+const BLUE = 'light-dark(#0064e0, #0a84ff)';
+const OFF_TRACK = 'light-dark(rgba(0,0,0,.09), rgba(255,255,255,.12))';
+
+class Component extends DCLogic {
+  state = { tab: null, on: PROJECTS.map(p => p[2]), sw: [true, false, true] };
+
+  renderVals() {
+    const tab = this.state.tab || this.props.tab || 'konto';
+    const isKonto = tab === 'konto';
+    const seg = (active) => ({
+      bg: active ? 'light-dark(#ffffff, rgba(255,255,255,.16))' : 'transparent',
+      ring: active ? '0 0 0 .5px light-dark(rgba(0,0,0,.06), rgba(0,0,0,.20)), 0 1px 2px light-dark(rgba(0,0,0,.10), rgba(0,0,0,.24))' : 'none',
+      fg: active ? 'light-dark(#1c1c1e, #f2f2f7)' : 'light-dark(rgba(60,60,67,.68), rgba(235,235,245,.62))'
+    });
+    const k = seg(isKonto), p = seg(!isKonto);
+    const count = this.state.on.filter(Boolean).length;
+
+    return {
+      isKonto, isProjekty: !isKonto,
+      kontoBg: k.bg, kontoRing: k.ring, kontoFg: k.fg,
+      projBg: p.bg, projRing: p.ring, projFg: p.fg,
+      showKonto: () => this.setState({ tab: 'konto' }),
+      showProjekty: () => this.setState({ tab: 'projekty' }),
+      countLabel: count + ' z ' + PROJECTS.length + ' projektów monitorowanych',
+      projects: PROJECTS.map((pr, i) => ({
+        name: pr[0], branch: pr[1], on: this.state.on[i],
+        rule: i === 0 ? 'none' : '.5px solid light-dark(rgba(0,0,0,.07), rgba(255,255,255,.06))',
+        boxBg: this.state.on[i] ? BLUE : 'light-dark(#ffffff, rgba(255,255,255,.06))',
+        boxRing: this.state.on[i] ? 'none' : 'inset 0 0 0 .5px light-dark(rgba(0,0,0,.22), rgba(255,255,255,.20))',
+        fg: this.state.on[i] ? 'light-dark(#1c1c1e, #f2f2f7)' : 'light-dark(rgba(60,60,67,.60), rgba(235,235,245,.55))',
+        toggle: () => this.setState(s => ({ on: s.on.map((v, j) => j === i ? !v : v) }))
+      })),
+      toggles: ['Uruchamiaj przy logowaniu', 'Powiadamiaj o sukcesach', 'Powiadamiaj o błędach'].map((label, i) => ({
+        label,
+        trackBg: this.state.sw[i] ? BLUE : OFF_TRACK,
+        trackRing: this.state.sw[i] ? 'none' : 'inset 0 0 0 .5px light-dark(rgba(0,0,0,.08), rgba(255,255,255,.06))',
+        knobX: this.state.sw[i] ? '14px' : '0px',
+        toggle: () => this.setState(s => ({ sw: s.sw.map((v, j) => j === i ? !v : v) }))
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>
