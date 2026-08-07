@@ -18,7 +18,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var notifySuccess = true
     @State private var notifyFailure = true
-    @State private var loginItemNeedsApproval = false
+    @State private var loginItemNeedsApproval = SMAppService.mainApp.status == .requiresApproval
 
     var body: some View {
         VStack(spacing: 0) {
