@@ -81,12 +81,3 @@ The app ships with English and Polish and follows the system language. Strings l
 
 [MIT](LICENSE).
 
----
-
-## Polski
-
-Stan deployów Vercela na żywo w pasku menu macOS. Trójkąt zmienia kolor (zielony = wdrożone, pulsujący niebieski = build w toku, czerwony = deploy padł), popover pokazuje listę ostatnich deployów z gałęzią, commitem i licznikiem builda, a powiadomienia z dźwiękiem zgłaszają start, sukces i wywrotkę każdego deployu.
-
-**Instalacja:** pobierz `VercelBar.zip` z [Releases](../../releases/latest), rozpakuj, przenieś `VercelBar.app` do Programów. Przy pierwszym uruchomieniu: prawy przycisk → Otwórz. Potem: kliknij trójkąt → **Połącz z Vercelem** → wklej token (vercel.com → Account Settings → Tokens; zakres: konto lub zespół do obserwowania) i zaznacz projekty w zakładce **Projekty**.
-
-Aplikacja podąża za językiem systemu (polski macOS → interfejs polski). Token trafia do pęku kluczy. Budowanie ze źródeł i odinstalowanie: sekcje wyżej.
