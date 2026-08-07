@@ -26,7 +26,24 @@ A small triangle sits in your menu bar and shows the state of your deploys at a 
 
 ## Install
 
-1. Download `VercelBar.zip` from [Releases](../../releases/latest) and unpack it.
+**Homebrew**
+
+```bash
+brew tap adrian-zielinski/vercelbar https://github.com/adrian-zielinski/vercelbar
+brew install --cask --no-quarantine vercelbar
+```
+
+**One command, no Homebrew**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/adrian-zielinski/vercelbar/main/install.sh | bash
+```
+
+The script downloads the latest release into Applications and launches it. Terminal downloads skip Gatekeeper's quarantine, so the app opens without the right-click dance.
+
+**Manually**
+
+1. Download `VercelBar.dmg` or `VercelBar.zip` from [Releases](../../releases/latest).
 2. Drag `VercelBar.app` into your Applications folder.
 3. On first launch: right-click → Open, then Open again. The app ships without a paid Apple signature; this dance happens once.
 
@@ -59,6 +76,9 @@ cd vercelbar
 
 # Build build/VercelBar.app and build/VercelBar.zip
 ./Scripts/build-app.sh
+
+# Optional: pack build/VercelBar.dmg from the freshly built zip
+./Scripts/make-dmg.sh
 
 # Run in place (dev mode; shows a Dock icon that the bundled app doesn't have)
 swift run vercelbar
