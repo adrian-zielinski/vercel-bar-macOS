@@ -8,6 +8,8 @@ import VercelBarKit
 final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationPresenter()
 
+    private let l10n = L10n()
+
     private var available: Bool { Bundle.main.bundleIdentifier != nil }
 
     func setUp() {
@@ -25,13 +27,12 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
         let url: URL?
         switch event.kind {
         case .failed:
-            title = "❌ \(event.projectName): deploy padł"
-            body = "\(branch) · build przerwany. Kliknij, aby otworzyć logi."
+            title = l10n.deployFailedTitle(project: event.projectName)
+            body = l10n.deployFailedBody(branch: branch)
             url = d.inspectorURL ?? d.previewURL
         case .succeeded:
-            title = "✅ \(event.projectName) wdrożony"
-            let time = d.duration.map { " w " + Format.duration($0) } ?? ""
-            body = "\(branch) · gotowe\(time). Kliknij, aby otworzyć podgląd."
+            title = l10n.deploySucceededTitle(project: event.projectName)
+            body = l10n.deploySucceededBody(branch: branch, duration: d.duration)
             url = d.previewURL ?? d.inspectorURL
         }
 
@@ -49,10 +50,10 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func showTokenInvalid() {
-        guard available else { print("POWIADOMIENIE: token nieprawidłowy"); return }
+        guard available else { print("POWIADOMIENIE: \(l10n.tokenInvalidNotificationTitle)"); return }
         let content = UNMutableNotificationContent()
-        content.title = "VercelBar: token nieprawidłowy"
-        content.body = "Otwórz Ustawienia i wklej nowy token dostępu."
+        content.title = l10n.tokenInvalidNotificationTitle
+        content.body = l10n.tokenInvalidNotificationBody
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: "token-invalid", content: content, trigger: nil))
     }

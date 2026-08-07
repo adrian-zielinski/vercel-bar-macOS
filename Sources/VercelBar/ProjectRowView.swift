@@ -7,6 +7,7 @@ struct ProjectRowView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered = false
     @State private var flash = false
+    private let l10n = L10n()
 
     private var deploy: DeploymentSummary? { project.latest }
     private var isError: Bool { deploy?.state == .error }
@@ -36,7 +37,7 @@ struct ProjectRowView: View {
             .accessibilityLabel("\(project.name), \(badgeLabel)")
             .accessibilityValue(accessibilityDetails)
             .accessibilityHint(deploy?.inspectorURL != nil || deploy?.previewURL != nil
-                               ? "Otwiera deploy w przeglądarce" : "")
+                               ? l10n.rowOpensInBrowserHint : "")
             .onChange(of: deploy?.state) { old, new in
                 guard !reduceMotion, old == .building || old == .initializing, new == .ready else { return }
                 // Koperta makiety `vb-flash 420ms`: szczyt przy 28 %, wygaszenie do 420 ms.
@@ -65,7 +66,7 @@ struct ProjectRowView: View {
                     Text("·")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
-                    Text(deploy?.commitMessage ?? "brak danych o commicie")
+                    Text(deploy?.commitMessage ?? l10n.noCommitInfo)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

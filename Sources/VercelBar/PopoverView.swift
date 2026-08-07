@@ -7,6 +7,7 @@ struct PopoverView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
+    private let l10n = L10n()
 
     /// Puls kropki nagłówka żyje lokalnie — `model.iconAlpha` zostaje wyłącznie dla ikony w pasku menu.
     private var pulsing: Bool { model.iconState == .building && !reduceMotion }
@@ -38,7 +39,7 @@ struct PopoverView: View {
                 .onChange(of: pulsing) { _, on in pulse = on }
             Text(headline).font(.system(size: 13, weight: .semibold))
             Spacer()
-            Text(model.lastRefreshed.map { "odświeżono \(Format.clock($0))" } ?? "")
+            Text(model.lastRefreshed.map { l10n.refreshedAt(Format.clock($0)) } ?? "")
                 .font(.system(size: 10.5))
                 .foregroundStyle(.tertiary)
         }
@@ -47,8 +48,8 @@ struct PopoverView: View {
 
     private var headline: String {
         switch model.phase {
-        case .offline: "Brak połączenia"
-        case .tokenInvalid: "Token nieprawidłowy"
+        case .offline: l10n.headlineOffline
+        case .tokenInvalid: l10n.headlineTokenInvalid
         default: StatusAggregator.headline(for: model.projects.map { $0.latest?.state ?? .unknown })
         }
     }
@@ -77,13 +78,13 @@ struct PopoverView: View {
             TriangleShape()
                 .fill(Color(nsColor: Theme.onboardingLogo))
                 .frame(width: 26, height: 23)
-            Text("Połącz konto Vercela, aby widzieć swoje deploye w pasku menu.")
+            Text(l10n.onboardingMessage)
                 .font(.system(size: 12.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .frame(maxWidth: 232)
-            actionButton("Połącz z Vercelem")
+            actionButton(l10n.connectButton)
         }
         .padding(EdgeInsets(top: 30, leading: 26, bottom: 26, trailing: 26))
     }
@@ -93,7 +94,7 @@ struct PopoverView: View {
             Image(systemName: "wifi.slash")
                 .font(.system(size: 20))
                 .foregroundStyle(.tertiary)
-            Text("Brak połączenia z internetem. Wznowię monitorowanie automatycznie.")
+            Text(l10n.offlineMessage)
                 .font(.system(size: 12.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -108,19 +109,19 @@ struct PopoverView: View {
             Image(systemName: "key.slash")
                 .font(.system(size: 20))
                 .foregroundStyle(.tertiary)
-            Text("Token dostępu został odrzucony przez Vercela. Wklej nowy w Ustawieniach.")
+            Text(l10n.tokenInvalidMessage)
                 .font(.system(size: 12.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .frame(maxWidth: 236)
-            actionButton("Otwórz Ustawienia")
+            actionButton(l10n.openSettingsButton)
         }
         .padding(EdgeInsets(top: 26, leading: 26, bottom: 24, trailing: 26))
     }
 
     private var emptyWatched: some View {
-        Text("Zaznacz projekty do obserwowania w Ustawieniach.")
+        Text(l10n.emptyWatchedMessage)
             .font(.system(size: 12.5))
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
@@ -147,13 +148,13 @@ struct PopoverView: View {
     private var footer: some View {
         HStack(spacing: 2) {
             if model.phase != .onboarding { // bez tokenu nie ma czego odświeżać
-                footerButton("Odśwież", system: "arrow.clockwise") {
+                footerButton(l10n.footerRefresh, system: "arrow.clockwise") {
                     Task { await model.refresh() }
                 }
             }
-            footerButton("Ustawienia", system: "gearshape") { openSettings() }
+            footerButton(l10n.footerSettings, system: "gearshape") { openSettings() }
             Spacer()
-            footerButton("Zakończ", system: "power") { NSApp.terminate(nil) }
+            footerButton(l10n.footerQuit, system: "power") { NSApp.terminate(nil) }
         }
         .padding(EdgeInsets(top: 5, leading: 7, bottom: 6, trailing: 7))
     }

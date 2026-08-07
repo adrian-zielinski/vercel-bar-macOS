@@ -6,12 +6,13 @@ import VercelBarKit
 struct SettingsView: View {
     @ObservedObject var model: AppModel
 
-    enum Tab: String, CaseIterable {
-        case konto = "Konto"
-        case projekty = "Projekty"
+    enum Tab: CaseIterable {
+        case account
+        case projects
     }
 
-    @State private var tab: Tab = .konto
+    private let l10n = L10n()
+    @State private var tab: Tab = .account
     @State private var tokenField = ""
     @State private var connectProblem: AppModel.ConnectResult?
     @State private var search = ""
@@ -23,7 +24,7 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $tab) {
-                ForEach(Tab.allCases, id: \.self) { Text($0.rawValue) }
+                ForEach(Tab.allCases, id: \.self) { Text(title(for: $0)) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -32,8 +33,8 @@ struct SettingsView: View {
 
             Group {
                 switch tab {
-                case .konto: kontoTab
-                case .projekty: projektyTab
+                case .account: accountTab
+                case .projects: projectsTab
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -50,21 +51,28 @@ struct SettingsView: View {
         }
     }
 
+    private func title(for tab: Tab) -> String {
+        switch tab {
+        case .account: l10n.tabAccount
+        case .projects: l10n.tabProjects
+        }
+    }
+
     // MARK: zakładka Konto
 
-    private var kontoTab: some View {
+    private var accountTab: some View {
         VStack(alignment: .leading, spacing: 14) {
-            row(label: "Token dostępu") {
+            row(label: l10n.accessTokenLabel) {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 7) {
-                        SecureField(model.hasToken ? "••••••••••••••••••••" : "wklej token…",
+                        SecureField(model.hasToken ? "••••••••••••••••••••" : l10n.tokenPlaceholder,
                                     text: $tokenField)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 12))
                             // Czerwona podpowiedź dotyczy tokenu, który właśnie zniknął z pola.
                             .onChange(of: tokenField) { _, _ in connectProblem = nil }
                             .onSubmit { saveToken() }
-                        Button("Zapisz") { saveToken() }
+                        Button(l10n.saveButton) { saveToken() }
                             .disabled(tokenField.isEmpty)
                     }
                     Text(tokenHint)
@@ -73,7 +81,7 @@ struct SettingsView: View {
                 }
             }
 
-            row(label: "Połączenie") {
+            row(label: l10n.connectionLabel) {
                 HStack(spacing: 9) {
                     Circle()
                         .fill(Color.primary.opacity(0.07))
@@ -82,14 +90,14 @@ struct SettingsView: View {
                             .font(.system(size: 10.5, weight: .bold))
                             .foregroundStyle(.secondary))
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(model.account?.name ?? model.account?.username ?? "Nie połączono")
+                        Text(model.account?.name ?? model.account?.username ?? l10n.notConnected)
                             .font(.system(size: 12.5, weight: .semibold))
                         HStack(spacing: 4) {
                             Circle()
                                 .fill(model.account != nil
                                       ? Color(nsColor: Theme.ready) : Color.secondary)
                                 .frame(width: 6, height: 6)
-                            Text(model.account != nil ? "Połączono" : "Wklej token powyżej")
+                            Text(model.account != nil ? l10n.connected : l10n.pasteTokenAbove)
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(model.account != nil
                                                  ? Color(nsColor: Theme.ready) : .secondary)
@@ -98,17 +106,17 @@ struct SettingsView: View {
                 }
             }
 
-            row(label: "Zespół") {
+            row(label: l10n.teamLabel) {
                 Picker("", selection: Binding(
                     get: { model.settings.teamID ?? "" },
                     set: { model.selectTeam(id: $0.isEmpty ? nil : $0) }
                 )) {
-                    Text("Konto osobiste").tag("")
+                    Text(l10n.personalAccount).tag("")
                     // Zanim lista zespołów dojedzie, Picker bez tej pozycji cofnąłby
                     // zaznaczenie na „Konto osobiste" i skłamał o zakresie.
                     if let current = model.settings.teamID,
                        !model.teams.contains(where: { $0.id == current }) {
-                        Text("Zespół (\(String(current.prefix(12)))…)").tag(current)
+                        Text(l10n.unknownTeam(idPrefix: String(current.prefix(12)))).tag(current)
                     }
                     ForEach(model.teams) { Text($0.name).tag($0.id) }
                 }
@@ -120,11 +128,11 @@ struct SettingsView: View {
 
     private var tokenHint: String {
         switch connectProblem {
-        case .rejected: "Vercel odrzucił ten token. Sprawdź, czy skopiowany w całości."
-        case .network: "Brak połączenia z Vercelem. Sprawdź internet i spróbuj ponownie."
-        case .keychainFailure: "Token poprawny, ale zapis w pęku kluczy się nie powiódł. Otwórz Keychain Access i sprawdź dostęp."
-        case .unexpectedResponse: "Vercel odpowiedział w nieoczekiwanym formacie — to problem aplikacji, nie tokenu. Zgłoś to autorowi."
-        default: "Token z panelu Vercela → Account Settings → Tokens. Zakres (scope): konto lub zespół, który chcesz obserwować."
+        case .rejected: l10n.tokenHintRejected
+        case .network: l10n.tokenHintNetwork
+        case .keychainFailure: l10n.tokenHintKeychainFailure
+        case .unexpectedResponse: l10n.tokenHintUnexpectedResponse
+        default: l10n.tokenHintDefault
         }
     }
 
@@ -158,10 +166,10 @@ struct SettingsView: View {
 
     // MARK: zakładka Projekty
 
-    private var projektyTab: some View {
+    private var projectsTab: some View {
         VStack(spacing: 9) {
             HStack(spacing: 10) {
-                TextField("Szukaj projektów", text: $search)
+                TextField(l10n.searchProjectsPlaceholder, text: $search)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12))
                 Text(countLabel)
@@ -192,9 +200,9 @@ struct SettingsView: View {
 
     /// Pusta lista znaczy co innego przed połączeniem, co innego bez sieci, a co innego w trakcie wczytywania.
     private var emptyListMessage: String {
-        if !model.hasToken { return "Połącz konto w zakładce Konto." }
-        if model.phase == .offline { return "Brak połączenia z Vercelem." }
-        return "Wczytywanie projektów…"
+        if !model.hasToken { return l10n.projectsEmptyNoToken }
+        if model.phase == .offline { return l10n.projectsEmptyOffline }
+        return l10n.projectsEmptyLoading
     }
 
     /// Zanim lista dojedzie, „3 z 0 projektów monitorowanych" zestawia trwałe ID z pustką.
@@ -203,7 +211,7 @@ struct SettingsView: View {
         // Zaznaczenia z innego zespołu zostają w ustawieniach — licz przecięcie z widoczną
         // listą, inaczej N zawyża i potrafi przebić M.
         let watched = model.allProjects.filter { model.settings.watchedProjectIDs.contains($0.id) }.count
-        return "\(watched) z \(model.allProjects.count) projektów monitorowanych"
+        return l10n.monitoredCount(watched, model.allProjects.count)
     }
 
     private var filteredProjects: [Project] {
@@ -217,11 +225,11 @@ struct SettingsView: View {
 
     private var togglesFooter: some View {
         VStack(spacing: 4) {
-            footerToggle("Uruchamiaj przy logowaniu", isOn: $launchAtLogin)
-            footerToggle("Powiadamiaj o sukcesach", isOn: $notifySuccess)
-            footerToggle("Powiadamiaj o błędach", isOn: $notifyFailure)
+            footerToggle(l10n.launchAtLogin, isOn: $launchAtLogin)
+            footerToggle(l10n.notifySuccess, isOn: $notifySuccess)
+            footerToggle(l10n.notifyFailure, isOn: $notifyFailure)
             if loginItemNeedsApproval {
-                Text("Zatwierdź w Ustawieniach systemowych → Elementy logowania")
+                Text(l10n.loginItemNeedsApproval)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

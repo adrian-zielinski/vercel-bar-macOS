@@ -16,7 +16,7 @@ struct VercelBarApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Ustawienia VercelBar", id: "settings") {
+        Window(L10n().settingsWindowTitle, id: "settings") {
             SettingsView(model: model)
         }
         .windowResizability(.contentSize)
