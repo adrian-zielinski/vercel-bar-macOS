@@ -62,11 +62,11 @@ struct PopoverView: View {
         case .offline: offline
         case .tokenInvalid: tokenInvalid
         case .normal:
-            if model.projects.isEmpty {
+            if model.feed.isEmpty {
                 emptyWatched
             } else {
                 VStack(spacing: 0) {
-                    ForEach(model.projects) { ProjectRowView(project: $0) }
+                    ForEach(model.feed) { ProjectRowView(entry: $0) }
                 }
                 .padding(.top, 5).padding(.bottom, 6)
             }

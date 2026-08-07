@@ -3,6 +3,7 @@ import Foundation
 /// Zdarzenie do pokazania użytkownikowi.
 public struct DeployEvent: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
+        case started
         case failed
         case succeeded
     }
@@ -27,23 +28,31 @@ public struct NotificationEngine {
             guard let current = p.latest else { continue }
             defer { lastSeen[p.id] = current }
             guard let previous = lastSeen[p.id] else { continue } // baseline — bez powiadomień
+            let isNewDeployment = previous.id != current.id
+
+            // Dedup po parze deploy+rodzaj: start i sukces tego samego builda to dwa zdarzenia,
+            // ale każde ma polecieć dokładnie raz.
+            func emit(_ kind: DeployEvent.Kind) {
+                let key = current.id + "|\(kind)"
+                guard !notified.contains(key) else { return }
+                notified.insert(key)
+                events.append(DeployEvent(kind: kind, projectName: p.name, deployment: current))
+            }
+
+            if isNewDeployment && current.state.isActive {
+                emit(.started)
+            }
 
             if current.state == .error {
-                let key = current.id + "|failed"
-                let alreadyErrored = previous.id == current.id && previous.state == .error
-                if !alreadyErrored && !notified.contains(key) {
-                    notified.insert(key)
-                    events.append(DeployEvent(kind: .failed, projectName: p.name, deployment: current))
-                }
+                let alreadyErrored = !isNewDeployment && previous.state == .error
+                if !alreadyErrored { emit(.failed) }
             }
 
             if current.state == .ready {
-                let key = current.id + "|succeeded"
-                let watchedInProgress = previous.id == current.id && previous.state.isActive
-                if watchedInProgress && !notified.contains(key) {
-                    notified.insert(key)
-                    events.append(DeployEvent(kind: .succeeded, projectName: p.name, deployment: current))
-                }
+                // Build widziany w toku albo nowy deployment zastany już gotowym — ten drugi
+                // przypadek to build krótszy niż odstęp między odpytaniami; wcześniej przechodził cicho.
+                let watchedInProgress = !isNewDeployment && previous.state.isActive
+                if watchedInProgress || isNewDeployment { emit(.succeeded) }
             }
         }
 

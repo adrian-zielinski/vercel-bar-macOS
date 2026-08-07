@@ -58,9 +58,15 @@ public struct VercelAPI: Sendable {
         return try APIDecoding.projects(from: data)
     }
 
+    /// Ostatnie deploye projektu, najnowszy pierwszy (kolejność za API).
+    public func recentDeployments(projectID: String, limit: Int) async throws -> [DeploymentSummary] {
+        let data = try await get("/v6/deployments",
+                                 query: ["projectId": projectID, "limit": String(limit)])
+        return try APIDecoding.deployments(from: data)
+    }
+
     public func latestDeployment(projectID: String) async throws -> DeploymentSummary? {
-        let data = try await get("/v6/deployments", query: ["projectId": projectID, "limit": "1"])
-        return try APIDecoding.deployments(from: data).first
+        try await recentDeployments(projectID: projectID, limit: 1).first
     }
 
     private func get(_ path: String, query: [String: String] = [:]) async throws -> Data {

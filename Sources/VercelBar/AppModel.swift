@@ -23,7 +23,8 @@ final class AppModel: ObservableObject {
     }
 
     @Published var phase: Phase = .onboarding
-    @Published var projects: [Project] = []
+    @Published var projects: [Project] = []      // nagłówek, agregat, silnik powiadomień
+    @Published var feed: [RefreshCore.FeedEntry] = [] // wiersze popovera
     @Published var allProjects: [Project] = []   // do listy w Ustawieniach
     @Published var overall: AggregateState = .idle
     @Published var anyActive = false // z migawki; overall == .error może maskować trwający build
@@ -35,6 +36,11 @@ final class AppModel: ObservableObject {
 
     let keychain = KeychainStore()
     let settings = SettingsStore()
+
+    /// Token trzymany w pamięci procesu: każdy odczyt pęku to potencjalny monit ACL
+    /// (macOS pyta o zgodę po każdej zmianie podpisu), a pętla odpytuje co 10–30 s.
+    /// Mniej odczytów = mniej monitów. Czyszczony przy 401, ustawiany po udanym connect().
+    private var cachedToken: String?
 
     private var engine = NotificationEngine()
     private var pollTask: Task<Void, Never>?
@@ -105,17 +111,42 @@ final class AppModel: ObservableObject {
         refreshInFlight = false
     }
 
-    private func performRefresh() async {
+    /// Wynik sięgnięcia po token: brak wpisu to co innego niż niedostępny pęk.
+    private enum TokenLookup {
+        case token(String)
+        case missing
+        case unavailable
+    }
+
+    private func resolveToken() async -> TokenLookup {
+        if let cachedToken { return .token(cachedToken) }
         // SecItemCopyMatching jest synchroniczne i przy systemowym promptcie potrafi stanąć
         // na kilka sekund — na MainActorze zamroziłoby ikonę paska menu.
         let kc = keychain
         let readResult: Result<String?, Error> = await Task.detached { Result { try kc.readToken() } }.value
-        let storedToken: String?
         switch readResult {
         case .success(let value):
-            storedToken = value
-            keychainReadFailures = 0
+            guard let value else { return .missing }
+            cachedToken = value
+            return .token(value)
         case .failure:
+            return .unavailable
+        }
+    }
+
+    private func performRefresh() async {
+        let token: String
+        switch await resolveToken() {
+        case .token(let value):
+            token = value
+            keychainReadFailures = 0
+        case .missing:
+            keychainReadFailures = 0
+            phase = .onboarding
+            hasToken = false
+            updatePulse(active: false) // bez tego ikona pulsuje dalej po usunięciu tokenu
+            return
+        case .unavailable:
             // Chwilowa niedostępność pęku (np. ACL po aktualizacji podpisu) nie zrywa sesji;
             // dopiero seria porażek znaczy trwały problem i wymaga wyjścia przez Ustawienia.
             keychainReadFailures += 1
@@ -125,18 +156,14 @@ final class AppModel: ObservableObject {
             }
             return
         }
-        guard let token = storedToken else {
-            phase = .onboarding
-            hasToken = false
-            updatePulse(active: false) // bez tego ikona pulsuje dalej po usunięciu tokenu
-            return
-        }
         let api = VercelAPI(token: token, teamID: settings.teamID)
         do {
             let snapshot = try await RefreshCore.fetch(api: api,
-                                                       watchedProjectIDs: settings.watchedProjectIDs)
+                                                       watchedProjectIDs: settings.watchedProjectIDs,
+                                                       feedLimit: settings.feedLimit)
             withAnimation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.3)) {
                 projects = snapshot.projects
+                feed = snapshot.feed
                 overall = snapshot.overall
                 anyActive = snapshot.anyActive
                 phase = .normal
@@ -146,11 +173,17 @@ final class AppModel: ObservableObject {
             updatePulse(active: snapshot.overall == .building)
 
             for event in engine.ingest(projects: snapshot.projects) {
-                let wanted = event.kind == .failed ? settings.notifyFailure : settings.notifySuccess
+                let wanted: Bool
+                switch event.kind {
+                case .started: wanted = settings.notifyStart
+                case .failed: wanted = settings.notifyFailure
+                case .succeeded: wanted = settings.notifySuccess
+                }
                 if wanted { NotificationPresenter.shared.show(event: event) }
             }
         } catch VercelAPIError.unauthorized {
             phase = .tokenInvalid
+            cachedToken = nil // następny cykl przeczyta świeży token z pęku
             consecutiveFailures += 1 // bez sensu młócić 401 co 30 s; connect() zeruje licznik
             updatePulse(active: false)
             if !tokenAlertShown {
@@ -179,6 +212,7 @@ final class AppModel: ObservableObject {
             // Stan „Połączono" dopiero po udanym zapisie — inaczej przy porażce pęku
             // UI melduje połączenie, którego następny odczyt tokenu nie potwierdzi.
             try keychain.writeToken(trimmed)
+            cachedToken = trimmed // pętla nie musi po niego wracać do pęku
             account = user
             teams = (try? await api.teams()) ?? []
             hasToken = true
@@ -208,9 +242,7 @@ final class AppModel: ObservableObject {
 
     /// Lista wszystkich projektów dla Ustawień (zakładka Projekty).
     func loadAllProjects() async {
-        let kc = keychain
-        let stored: String? = await Task.detached { (try? kc.readToken()) ?? nil }.value
-        guard let token = stored else { return }
+        guard case .token(let token) = await resolveToken() else { return }
         let api = VercelAPI(token: token, teamID: settings.teamID)
         if let fetched = try? await api.projects() { allProjects = fetched } // błąd nie zeruje listy
         if account == nil { account = try? await api.user() }
@@ -225,6 +257,14 @@ final class AppModel: ObservableObject {
         // refresh odbije się od refreshInFlight albo padnie na 5xx, nie doczeka się wcale.
         objectWillChange.send()
         settings.watchedProjectIDs = ids
+        Task { await refresh() }
+    }
+
+    /// `objectWillChange` z tego samego powodu co w `toggleWatched` — SettingsStore nie jest
+    /// ObservableObject, więc segmentowany przełącznik inaczej stoi na starej wartości do końca refresh().
+    func setFeedLimit(_ limit: Int) {
+        objectWillChange.send()
+        settings.feedLimit = limit
         Task { await refresh() }
     }
 

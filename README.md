@@ -2,8 +2,8 @@
 
 Aplikacja paska menu macOS: stan deployów Vercela na żywo. Trójkąt w pasku
 zmienia kolor (zielony = wdrożone, niebieski pulsujący = build w toku,
-czerwony = błąd), popover pokazuje obserwowane projekty, a powiadomienia
-zgłaszają padnięte i ukończone deploye.
+czerwony = błąd), popover pokazuje ostatnie deploye obserwowanych projektów,
+a powiadomienia zgłaszają start, sukces i porażkę builda.
 
 ## Instalacja
 
@@ -21,6 +21,8 @@ zgłaszają padnięte i ukończone deploye.
    konto lub zespół, który chcesz obserwować.
 2. Klik w trójkąt → Połącz z Vercelem → wklej token.
 3. Zakładka Projekty → zaznacz, co obserwować.
+4. Stopka Ustawień: długość listy w popoverze (3/5/10 pozycji łącznie) i to,
+   o czym powiadamiać.
 
 Token ląduje w Keychain. Aplikacja odpytuje API co 30 s (10 s podczas builda).
 
@@ -45,8 +47,8 @@ inny → angielski. Bez przełącznika.
 
 macOS menu bar app showing live Vercel deploy status. The triangle in the menu
 bar changes color (green = deployed, pulsing blue = build running, red = failed),
-the popover lists your watched projects, and notifications report failed and
-finished deploys.
+the popover lists the latest deploys across your watched projects, and
+notifications report when a build starts, succeeds, or fails.
 
 The UI follows your system language: Polish system → Polish, anything else →
 English. No switch to flip.
@@ -66,6 +68,8 @@ English. No switch to flip.
    account or team you want to watch.
 2. Click the triangle → Connect to Vercel → paste the token.
 3. Projects tab → check what to watch.
+4. Settings footer: how many deploys the popover lists (3/5/10 in total) and
+   what to be notified about.
 
 The token goes into the Keychain. The app polls the API every 30 s (10 s during
 a build).

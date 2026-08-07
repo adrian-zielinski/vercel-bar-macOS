@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = SettingsView.loginItemRegistered()
     @State private var notifySuccess = true
     @State private var notifyFailure = true
+    @State private var notifyStart = true
     @State private var loginItemNeedsApproval = SMAppService.mainApp.status == .requiresApproval
 
     var body: some View {
@@ -43,10 +44,13 @@ struct SettingsView: View {
             Divider()
             togglesFooter
         }
-        .frame(width: 480, height: 380)
+        // Wyższe niż makietowe 380: stopka urosła o wybór długości listy i czwarty przełącznik,
+        // a przy 380 lista projektów schodziła do dwóch widocznych wierszy.
+        .frame(width: 480, height: 442)
         .onAppear {
             notifySuccess = model.settings.notifySuccess
             notifyFailure = model.settings.notifyFailure
+            notifyStart = model.settings.notifyStart
             Task { await model.loadAllProjects() }
         }
     }
@@ -225,7 +229,9 @@ struct SettingsView: View {
 
     private var togglesFooter: some View {
         VStack(spacing: 4) {
+            feedLimitRow
             footerToggle(l10n.launchAtLogin, isOn: $launchAtLogin)
+            footerToggle(l10n.notifyStart, isOn: $notifyStart)
             footerToggle(l10n.notifySuccess, isOn: $notifySuccess)
             footerToggle(l10n.notifyFailure, isOn: $notifyFailure)
             if loginItemNeedsApproval {
@@ -237,8 +243,28 @@ struct SettingsView: View {
         }
         .padding(EdgeInsets(top: 11, leading: 22, bottom: 14, trailing: 22))
         .onChange(of: launchAtLogin) { _, on in setLaunchAtLogin(on) }
+        .onChange(of: notifyStart) { _, on in model.settings.notifyStart = on }
         .onChange(of: notifySuccess) { _, on in model.settings.notifySuccess = on }
         .onChange(of: notifyFailure) { _, on in model.settings.notifyFailure = on }
+    }
+
+    /// Długość listy w popoverze — nie przełącznik, więc ma własny wiersz zamiast `footerToggle`.
+    private var feedLimitRow: some View {
+        HStack(spacing: 10) {
+            Text(l10n.feedLimitLabel).font(.system(size: 12))
+            Spacer()
+            Picker("", selection: Binding(
+                get: { model.settings.feedLimit },
+                set: { model.setFeedLimit($0) }
+            )) {
+                ForEach(SettingsStore.allowedFeedLimits, id: \.self) { Text("\($0)").tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 132)
+            .accessibilityLabel(l10n.feedLimitLabel)
+        }
+        .frame(height: 27)
     }
 
     private func footerToggle(_ label: String, isOn: Binding<Bool>) -> some View {

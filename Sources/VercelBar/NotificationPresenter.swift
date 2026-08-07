@@ -26,6 +26,10 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
         let body: String
         let url: URL?
         switch event.kind {
+        case .started:
+            title = l10n.deployStartedTitle(project: event.projectName)
+            body = l10n.deployStartedBody(branch: branch)
+            url = d.inspectorURL ?? d.previewURL // buduje się — jest co pokazać tylko w logach
         case .failed:
             title = l10n.deployFailedTitle(project: event.projectName)
             body = l10n.deployFailedBody(branch: branch)
@@ -43,6 +47,7 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
+        content.sound = .default // bez tego baner wchodzi bezgłośnie i ginie w kącie ekranu
         if let url { content.userInfo = ["url": url.absoluteString] }
         let request = UNNotificationRequest(identifier: "\(d.id).\(event.kind)",
                                             content: content, trigger: nil)
@@ -54,6 +59,7 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
         let content = UNMutableNotificationContent()
         content.title = l10n.tokenInvalidNotificationTitle
         content.body = l10n.tokenInvalidNotificationBody
+        content.sound = .default
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: "token-invalid", content: content, trigger: nil))
     }

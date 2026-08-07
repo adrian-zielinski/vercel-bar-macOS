@@ -319,6 +319,16 @@ t.equal(plTexts.deployFailedBody(branch: "main"),
         "main · build przerwany. Kliknij, aby otworzyć logi.", "treść porażki po polsku")
 t.equal(enTexts.deployFailedBody(branch: "main"),
         "main · build failed. Click to open the logs.", "treść porażki po angielsku")
+t.equal(plTexts.deployStartedTitle(project: "sklep"), "🚀 sklep: deploy ruszył", "tytuł startu po polsku")
+t.equal(enTexts.deployStartedTitle(project: "sklep"), "🚀 sklep: deploy started", "tytuł startu po angielsku")
+t.equal(plTexts.deployStartedBody(branch: "main"),
+        "main · buduje się. Kliknij, aby otworzyć szczegóły.", "treść startu po polsku")
+t.equal(enTexts.deployStartedBody(branch: "main"),
+        "main · building. Click to open details.", "treść startu po angielsku")
+t.equal(plTexts.notifyStart, "Powiadamiaj o starcie deployu", "przełącznik startu po polsku")
+t.equal(enTexts.notifyStart, "Notify when a deploy starts", "przełącznik startu po angielsku")
+t.equal(plTexts.feedLimitLabel, "Pozycje na liście", "etykieta liczby pozycji po polsku")
+t.equal(enTexts.feedLimitLabel, "List items", "etykieta liczby pozycji po angielsku")
 t.equal(L10n(lang: .en).lang, .en, "L10n pamięta wybrany język")
 
 // MARK: - Silnik powiadomień
@@ -360,10 +370,16 @@ let okEvents = e4.ingest(projects: [project("sklep", id: "p1", deploy: summary(i
 t.equal(okEvents.count, 1, "building → ready daje zdarzenie")
 t.equal(okEvents.first?.kind, .succeeded, "rodzaj: succeeded")
 
+// Build krótszy niż odstęp między odpytaniami: między migawkami doszedł nowy deployment
+// i zdążył się zbudować. Wcześniej takie wdrożenie przechodziło bez słowa — teraz melduje sukces.
 var e5 = NotificationEngine()
 _ = e5.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
-let silentOK = e5.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
-t.equal(silentOK, [], "deploy, którego nie widzieliśmy w toku, nie powiadamia o sukcesie")
+let fastOK = e5.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
+t.equal(fastOK.count, 1, "deploy zbudowany między odpytaniami powiadamia o sukcesie")
+t.equal(fastOK.first?.kind, .succeeded, "rodzaj: succeeded, bez started")
+t.equal(fastOK.first?.deployment.id, "d2", "zdarzenie niesie nowy deployment")
+let fastOKAgain = e5.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
+t.equal(fastOKAgain, [], "…i nie powtarza się przy kolejnym odpytaniu")
 
 t.suite("NotificationEngine — nowy projekt w trakcie działania")
 var e6 = NotificationEngine()
@@ -386,7 +402,7 @@ t.equal(stillErr, [], "błąd zastany na starcie nie powiadamia przy kolejnym od
 var e8 = NotificationEngine()
 _ = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
 let pushed = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .queued))])
-t.equal(pushed, [], "nowy deploy w kolejce nie powiadamia")
+t.equal(pushed.map(\.kind), [.started], "nowy deploy w kolejce melduje start")
 let mid1 = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .building))])
 let mid2 = e8.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .building))])
 t.equal(mid1 + mid2, [], "kolejne odpytania w trakcie builda milczą")
@@ -431,11 +447,12 @@ _ = e12.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", s
 let backToErr = e12.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
 t.equal(backToErr, [], "ten sam błąd po przetasowaniu deployów nie powiadamia drugi raz")
 
-t.suite("NotificationEngine — sukces innego deployu niż obserwowany")
+t.suite("NotificationEngine — build wyparty przez nowszy, gotowy deploy")
 var e13 = NotificationEngine()
 _ = e13.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
 let otherReady = e13.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
-t.equal(otherReady, [], "ready innego deployu niż widziany w toku nie powiadamia")
+t.equal(otherReady.map(\.kind), [.succeeded], "nowszy deploy zastany w ready melduje sukces raz")
+t.equal(otherReady.first?.deployment.id, "d2", "…i to sukces nowego deploymentu, nie wypartego builda")
 
 t.suite("NotificationEngine — odznaczenie i ponowne zaznaczenie projektu")
 var e14 = NotificationEngine()
@@ -443,6 +460,44 @@ _ = e14.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", s
 _ = e14.ingest(projects: []) // projekt odznaczony — baseline znika
 let rewatch = e14.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .error))])
 t.equal(rewatch, [], "po ponownym zaznaczeniu najpierw świeży baseline, bez powiadomienia o starym błędzie")
+
+t.suite("NotificationEngine — start deployu")
+var e16 = NotificationEngine()
+_ = e16.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+let started = e16.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .building))])
+t.equal(started.count, 1, "nowy deployment w buildzie daje zdarzenie")
+t.equal(started.first?.kind, .started, "rodzaj: started")
+t.equal(started.first?.projectName, "sklep", "nazwa projektu w zdarzeniu startu")
+t.equal(started.first?.deployment.id, "d2", "zdarzenie niesie nowy deployment")
+let startedAgain = e16.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .building))])
+t.equal(startedAgain, [], "ten sam build nie melduje startu drugi raz")
+let startedThird = e16.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .building))])
+t.equal(startedThird, [], "…ani przy trzecim odpytaniu")
+
+// Start i sukces tego samego deploymentu to dwa osobne zdarzenia — dedup jest po parze id|rodzaj.
+var e17 = NotificationEngine()
+_ = e17.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+let cycleStart = e17.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .building))])
+let cycleEnd = e17.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
+t.equal((cycleStart + cycleEnd).map(\.kind), [.started, .succeeded],
+        "sekwencja started → succeeded dla jednego id daje dwa zdarzenia")
+
+// Deploy zastany od razu w ready nie miał okazji zameldować startu — sam sukces.
+var e18 = NotificationEngine()
+_ = e18.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+let readyStraightAway = e18.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .ready))])
+t.equal(readyStraightAway.map(\.kind), [.succeeded], "nowy deploy od razu w ready → tylko succeeded")
+
+// Nowy deployment, który zdążył się wywrócić, też nie melduje startu.
+var e19 = NotificationEngine()
+_ = e19.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+let brokeStraightAway = e19.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d2", state: .error))])
+t.equal(brokeStraightAway.map(\.kind), [.failed], "nowy deploy od razu w błędzie → tylko failed")
+
+// Pierwsza obserwacja zostaje cicha także dla startu.
+var e20 = NotificationEngine()
+let baselineBuilding = e20.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+t.equal(baselineBuilding, [], "build zastany przy pierwszym odpytaniu nie melduje startu")
 
 t.suite("NotificationEngine — dedup sukcesu po regresie stanu z API")
 var e15 = NotificationEngine()
@@ -543,6 +598,20 @@ let latest = try await api.latestDeployment(projectID: "prj_1")
 t.equal(latest?.id, "d9", "najnowszy deploy z /v6/deployments")
 t.check(stub.lastRequest?.url?.query?.contains("projectId=prj_1") == true, "projectId w query")
 t.check(stub.lastRequest?.url?.query?.contains("limit=1") == true, "limit=1 w query")
+
+t.suite("VercelAPI — recentDeployments")
+stub.responses["/v6/deployments"] = (200, Data("""
+{"deployments":[{"uid":"d9","state":"READY","createdAt":1754470030000},
+                {"uid":"d8","state":"ERROR","createdAt":1754470020000},
+                {"uid":"d7","state":"READY","createdAt":1754470010000}]}
+""".utf8))
+let recent = try await api.recentDeployments(projectID: "prj_1", limit: 5)
+t.equal(recent.map(\.id), ["d9", "d8", "d7"], "cała lista, nie tylko pierwszy")
+t.check(stub.lastRequest?.url?.query?.contains("limit=5") == true, "limit=5 w query")
+t.check(stub.lastRequest?.url?.query?.contains("projectId=prj_1") == true, "projectId w query")
+let latestOfMany = try await api.latestDeployment(projectID: "prj_1")
+t.equal(latestOfMany?.id, "d9", "latestDeployment bierze pierwszy z listy")
+t.check(stub.lastRequest?.url?.query?.contains("limit=1") == true, "latestDeployment nadal pyta o limit=1")
 
 t.suite("VercelAPI — projects i teams")
 stub.responses["/v9/projects"] = (200, Data(#"{"projects":[{"id":"p1","name":"sklep"}]}"#.utf8))
@@ -687,6 +756,80 @@ do {
     t.equal(e, .server(500), "500 jednego projektu przerywa cały fetch")
 } catch { t.check(false, "zły typ błędu: \(error)") }
 
+t.suite("RefreshCore — feed scalony z wielu projektów")
+// Dwa projekty po trzy deploye, naprzemienne createdAt: feed ma je przepleść po czasie,
+// a nie skleić projekt po projekcie.
+let feedStub = StubSession(runner: t)
+let feedBase = 1_754_470_000_000.0
+feedStub.responses["/v9/projects"] = (200, Data("""
+{"projects":[{"id":"fp1","name":"sklep-online"},{"id":"fp2","name":"blog-firmowy"},{"id":"fp3","name":"pusty"}]}
+""".utf8))
+func deployJSON(_ uid: String, offsetSeconds: Double) -> String {
+    #"{"uid":"\#(uid)","state":"READY","createdAt":\#(Int(feedBase + offsetSeconds * 1000))}"#
+}
+feedStub.responses["projectId=fp1"] = (200, Data("""
+{"deployments":[\(deployJSON("d1a", offsetSeconds: 100)),\
+\(deployJSON("d1b", offsetSeconds: 80)),\
+\(deployJSON("d1c", offsetSeconds: 60))]}
+""".utf8))
+feedStub.responses["projectId=fp2"] = (200, Data("""
+{"deployments":[\(deployJSON("d2a", offsetSeconds: 90)),\
+\(deployJSON("d2b", offsetSeconds: 70)),\
+\(deployJSON("d2c", offsetSeconds: 50))]}
+""".utf8))
+feedStub.responses["projectId=fp3"] = (200, Data(#"{"deployments":[]}"#.utf8))
+let feedAPI = VercelAPI(token: "t", session: feedStub)
+
+let feed5 = try await RefreshCore.fetch(api: feedAPI, watchedProjectIDs: ["fp1", "fp2"], feedLimit: 5)
+t.equal(feed5.feed.map(\.id), ["d1a", "d2a", "d1b", "d2b", "d1c"],
+        "sześć deployów scalonych, posortowanych malejąco i przyciętych do 5 ŁĄCZNIE")
+t.equal(feed5.feed.map(\.projectName), ["sklep-online", "blog-firmowy", "sklep-online", "blog-firmowy", "sklep-online"],
+        "każda pozycja niesie nazwę swojego projektu")
+t.equal(feed5.feed.map(\.projectID), ["fp1", "fp2", "fp1", "fp2", "fp1"], "pozycja niesie też id projektu")
+t.equal(feed5.projects.count, 2, "agregat dalej liczy projekty, nie pozycje listy")
+t.equal(feed5.projects.first(where: { $0.id == "fp1" })?.latest?.id, "d1a",
+        "Project.latest to najnowszy deploy projektu")
+t.equal(feed5.projects.first(where: { $0.id == "fp2" })?.latest?.id, "d2a", "to samo dla drugiego projektu")
+t.equal(feed5.overall, .ready, "stan zbiorczy bez zmian — liczy się tylko najnowszy deploy projektu")
+
+let feed3 = try await RefreshCore.fetch(api: feedAPI, watchedProjectIDs: ["fp1", "fp2"], feedLimit: 3)
+t.equal(feed3.feed.map(\.id), ["d1a", "d2a", "d1b"], "limit 3 przycina feed do trzech pozycji")
+
+let feedDefault = try await RefreshCore.fetch(api: feedAPI, watchedProjectIDs: ["fp1", "fp2"])
+t.equal(feedDefault.feed.count, 5, "domyślny feedLimit to 5")
+
+let feedHole = try await RefreshCore.fetch(api: feedAPI, watchedProjectIDs: ["fp1", "fp3"], feedLimit: 5)
+t.equal(feedHole.feed.map(\.id), ["d1a", "d1b", "d1c"], "projekt bez deployów nie psuje feedu")
+t.equal(feedHole.projects.count, 2, "projekt bez deployów zostaje wśród projektów")
+t.check(feedHole.projects.first(where: { $0.id == "fp3" })?.latest == nil, "…z latest == nil")
+
+let feedNone = try await RefreshCore.fetch(api: feedAPI, watchedProjectIDs: [], feedLimit: 5)
+t.equal(feedNone.feed.count, 0, "brak obserwowanych → pusty feed")
+
+t.suite("RefreshCore — remisy i brak createdAt w feedzie")
+// Task group kończy się w losowej kolejności, więc remis po createdAt i pozycje bez daty
+// muszą mieć rozstrzygnięcie deterministyczne — inaczej lista tasuje się co odświeżenie.
+let tieFeedStub = StubSession(runner: t)
+tieFeedStub.responses["/v9/projects"] = (200, Data("""
+{"projects":[{"id":"tz","name":"zebra"},{"id":"ta","name":"alfa"}]}
+""".utf8))
+tieFeedStub.responses["projectId=tz"] = (200, Data("""
+{"deployments":[{"uid":"z1","state":"READY","createdAt":1754470000000},{"uid":"z0","state":"READY"}]}
+""".utf8))
+tieFeedStub.responses["projectId=ta"] = (200, Data("""
+{"deployments":[{"uid":"a1","state":"READY","createdAt":1754470000000}]}
+""".utf8))
+let tieFeedAPI = VercelAPI(token: "t", session: tieFeedStub)
+var tieFeedOrders: [[String]] = []
+for _ in 0..<5 {
+    tieFeedOrders.append(try await RefreshCore.fetch(api: tieFeedAPI,
+                                                     watchedProjectIDs: ["tz", "ta"],
+                                                     feedLimit: 10).feed.map(\.id))
+}
+t.equal(Set(tieFeedOrders.map { $0.joined(separator: "|") }).count, 1, "pięć przebiegów daje ten sam feed")
+t.equal(tieFeedOrders.first ?? [], ["a1", "z1", "z0"],
+        "remis rozstrzyga nazwa projektu, a deploy bez createdAt ląduje na końcu")
+
 t.suite("RefreshCore — okno równoległości")
 // Bez limitu salwa requestów przy kilkudziesięciu projektach łapie 429, a jeden 429
 // wywraca całą migawkę (patrz suita wyżej). Stub mierzy szczyt równoczesnych wywołań.
@@ -750,19 +893,44 @@ let settings = SettingsStore(defaults: defaults)
 t.equal(settings.watchedProjectIDs, [], "domyślnie brak obserwowanych")
 t.equal(settings.notifySuccess, true, "sukcesy domyślnie włączone")
 t.equal(settings.notifyFailure, true, "błędy domyślnie włączone")
+t.equal(settings.notifyStart, true, "start deployu domyślnie włączony")
+t.equal(settings.feedLimit, 5, "domyślnie 5 pozycji na liście")
 t.equal(settings.teamID, nil, "domyślnie konto osobiste")
 
 settings.watchedProjectIDs = ["prj_1", "prj_2"]
 settings.notifySuccess = false
 settings.notifyFailure = false
+settings.notifyStart = false
+settings.feedLimit = 10
 settings.teamID = "team_9"
 let reloaded = SettingsStore(defaults: defaults)
 t.equal(reloaded.watchedProjectIDs, ["prj_1", "prj_2"], "obserwowane trwają po ponownym wczytaniu")
 t.equal(reloaded.notifySuccess, false, "wyłączenie sukcesów trwa")
 t.equal(reloaded.notifyFailure, false, "wyłączenie błędów trwa")
+t.equal(reloaded.notifyStart, false, "wyłączenie startu trwa")
+t.equal(reloaded.feedLimit, 10, "liczba pozycji trwa po ponownym wczytaniu")
 t.equal(reloaded.teamID, "team_9", "team trwa")
 reloaded.teamID = nil
 t.equal(SettingsStore(defaults: defaults).teamID, nil, "powrót do konta osobistego")
+
+t.suite("SettingsStore — sanityzacja feedLimit")
+t.equal(SettingsStore.allowedFeedLimits, [3, 5, 10], "dopuszczalne wartości listy")
+for value in [3, 5, 10] {
+    settings.feedLimit = value
+    t.equal(settings.feedLimit, value, "\(value) przechodzi bez zmian")
+}
+// Ręczna edycja plist albo plik po starszej wersji: wartość spoza zbioru nie może
+// dojechać do zapytania `limit=<n>` ani do przycięcia listy.
+defaults.set(7, forKey: "feedLimit")
+t.equal(settings.feedLimit, 5, "wartość spoza 3/5/10 czytana jako 5")
+defaults.set(0, forKey: "feedLimit")
+t.equal(settings.feedLimit, 5, "zero czytane jako 5")
+defaults.set(-2, forKey: "feedLimit")
+t.equal(settings.feedLimit, 5, "wartość ujemna czytana jako 5")
+defaults.set("dużo", forKey: "feedLimit")
+t.equal(settings.feedLimit, 5, "wartość nie-liczbowa czytana jako 5")
+settings.feedLimit = 4
+t.equal(SettingsStore(defaults: defaults).feedLimit, 5, "zapis złej wartości też ląduje na 5")
 defaults.removePersistentDomain(forName: suiteName)
 
 // MARK: - Ikona paska menu

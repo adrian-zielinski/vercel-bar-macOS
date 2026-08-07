@@ -129,9 +129,11 @@ public struct L10n: Sendable {
         t("Połącz konto w zakładce Konto.", "Connect your account in the Account tab.")
     }
 
+    public var feedLimitLabel: String { t("Pozycje na liście", "List items") }
     public var launchAtLogin: String { t("Uruchamiaj przy logowaniu", "Launch at login") }
     public var notifySuccess: String { t("Powiadamiaj o sukcesach", "Notify on successful deploys") }
     public var notifyFailure: String { t("Powiadamiaj o błędach", "Notify on failed deploys") }
+    public var notifyStart: String { t("Powiadamiaj o starcie deployu", "Notify when a deploy starts") }
 
     public var loginItemNeedsApproval: String {
         t("Zatwierdź w Ustawieniach systemowych → Elementy logowania",
@@ -139,6 +141,15 @@ public struct L10n: Sendable {
     }
 
     // MARK: powiadomienia
+
+    public func deployStartedTitle(project: String) -> String {
+        t("🚀 \(project): deploy ruszył", "🚀 \(project): deploy started")
+    }
+
+    public func deployStartedBody(branch: String) -> String {
+        t("\(branch) · buduje się. Kliknij, aby otworzyć szczegóły.",
+          "\(branch) · building. Click to open details.")
+    }
 
     public func deployFailedTitle(project: String) -> String {
         t("❌ \(project): deploy padł", "❌ \(project): deploy failed")

@@ -1,23 +1,22 @@
 import SwiftUI
 import VercelBarKit
 
-/// Jeden wiersz projektu w popoverze.
+/// Jeden deploy w popoverze — jeden projekt może zajmować kilka wierszy.
 struct ProjectRowView: View {
-    let project: Project
+    let entry: RefreshCore.FeedEntry
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered = false
     @State private var flash = false
     private let l10n = L10n()
 
-    private var deploy: DeploymentSummary? { project.latest }
-    private var isError: Bool { deploy?.state == .error }
-    private var isBuilding: Bool { deploy?.state == .building || deploy?.state == .initializing }
+    private var deploy: DeploymentSummary { entry.deployment }
+    private var isError: Bool { deploy.state == .error }
+    private var isBuilding: Bool { deploy.state == .building || deploy.state == .initializing }
+    private var openURL: URL? { deploy.inspectorURL ?? deploy.previewURL }
 
     /// Strzałka to obietnica otwarcia — wiersz bez adresów jej nie składa. `.disabled`
     /// załatwiłoby to samo, ale przygasza całą treść i rozjeżdża wiersz z makietą.
-    private var showsOpenArrow: Bool {
-        hovered && (deploy?.inspectorURL != nil || deploy?.previewURL != nil)
-    }
+    private var showsOpenArrow: Bool { hovered && openURL != nil }
 
     var body: some View {
         Button(action: open) { rowContent }
@@ -34,11 +33,10 @@ struct ProjectRowView: View {
             .clipShape(RoundedRectangle(cornerRadius: 7))
             .padding(.horizontal, 5)
             .onHover { hovered = $0 }
-            .accessibilityLabel("\(project.name), \(badgeLabel)")
+            .accessibilityLabel("\(entry.projectName), \(badgeLabel)")
             .accessibilityValue(accessibilityDetails)
-            .accessibilityHint(deploy?.inspectorURL != nil || deploy?.previewURL != nil
-                               ? l10n.rowOpensInBrowserHint : "")
-            .onChange(of: deploy?.state) { old, new in
+            .accessibilityHint(openURL != nil ? l10n.rowOpensInBrowserHint : "")
+            .onChange(of: deploy.state) { old, new in
                 guard !reduceMotion, old == .building || old == .initializing, new == .ready else { return }
                 // Koperta makiety `vb-flash 420ms`: szczyt przy 28 %, wygaszenie do 420 ms.
                 withAnimation(.spring(duration: 0.12, bounce: 0.3)) { flash = true }
@@ -52,13 +50,13 @@ struct ProjectRowView: View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(project.name)
+                    Text(entry.projectName)
                         .font(.system(size: 12.5, weight: .semibold))
                         .lineLimit(1)
                     badge
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(deploy?.branch ?? "—")
+                    Text(deploy.branch ?? "—")
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -66,7 +64,7 @@ struct ProjectRowView: View {
                     Text("·")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
-                    Text(deploy?.commitMessage ?? l10n.noCommitInfo)
+                    Text(deploy.commitMessage ?? l10n.noCommitInfo)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -78,7 +76,7 @@ struct ProjectRowView: View {
             Spacer(minLength: 8)
             HStack(spacing: 3) {
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text((deploy?.createdAt).map { Format.relative($0) } ?? "")
+                    Text(deploy.createdAt.map { Format.relative($0) } ?? "")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
@@ -99,7 +97,7 @@ struct ProjectRowView: View {
     }
 
     private var accessibilityDetails: String {
-        [deploy?.branch, deploy?.commitMessage].compactMap { $0 }.joined(separator: ", ")
+        [deploy.branch, deploy.commitMessage].compactMap { $0 }.joined(separator: ", ")
     }
 
     private var badge: some View {
@@ -116,18 +114,18 @@ struct ProjectRowView: View {
     }
 
     private var badgeLabel: String {
-        switch deploy?.state {
+        switch deploy.state {
         case .ready: "Ready"
         case .error: "Error"
         case .building, .initializing: "Building"
         case .canceled: "Canceled"
         case .unknown: "—"
-        default: "Queued"
+        case .queued: "Queued"
         }
     }
 
     private var badgeFg: NSColor {
-        switch deploy?.state {
+        switch deploy.state {
         case .ready: Theme.ready
         case .error: Theme.error
         case .building, .initializing: Theme.building
@@ -136,7 +134,7 @@ struct ProjectRowView: View {
     }
 
     private var badgeBg: NSColor {
-        switch deploy?.state {
+        switch deploy.state {
         case .ready: Theme.badgeReadyBg
         case .error: Theme.badgeErrorBg
         case .building, .initializing: Theme.badgeBuildingBg
@@ -146,7 +144,7 @@ struct ProjectRowView: View {
 
     /// Trwający build tyka co sekundę; zakończony deploy ma stałą wartość i nie potrzebuje harmonogramu.
     @ViewBuilder private var durationLabel: some View {
-        if deploy?.duration == nil, isBuilding {
+        if deploy.duration == nil, isBuilding {
             TimelineView(.periodic(from: .now, by: 1)) { _ in durationChip }
         } else {
             durationChip
@@ -165,7 +163,6 @@ struct ProjectRowView: View {
     }
 
     private var durationText: String? {
-        guard let deploy else { return nil }
         if let done = deploy.duration { return Format.duration(done) }
         if isBuilding, let start = deploy.buildingAt ?? deploy.createdAt {
             return Format.duration(Date().timeIntervalSince(start))
@@ -188,7 +185,7 @@ struct ProjectRowView: View {
     }
 
     private func open() {
-        guard let url = deploy?.inspectorURL ?? deploy?.previewURL else { return }
+        guard let url = openURL else { return }
         NSWorkspace.shared.open(url)
     }
 }
