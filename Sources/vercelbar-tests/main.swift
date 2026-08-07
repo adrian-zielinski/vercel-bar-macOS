@@ -327,8 +327,8 @@ t.equal(enTexts.deployStartedBody(branch: "main"),
         "main · building. Click to open details.", "treść startu po angielsku")
 t.equal(plTexts.notifyStart, "Powiadamiaj o starcie deployu", "przełącznik startu po polsku")
 t.equal(enTexts.notifyStart, "Notify when a deploy starts", "przełącznik startu po angielsku")
-t.equal(plTexts.feedLimitLabel, "Pozycje na liście", "etykieta liczby pozycji po polsku")
-t.equal(enTexts.feedLimitLabel, "List items", "etykieta liczby pozycji po angielsku")
+t.equal(plTexts.feedLimitLabel, "Historia deployów", "etykieta głębokości historii po polsku")
+t.equal(enTexts.feedLimitLabel, "Deploy history", "etykieta głębokości historii po angielsku")
 t.equal(L10n(lang: .en).lang, .en, "L10n pamięta wybrany język")
 
 // MARK: - Silnik powiadomień
@@ -498,6 +498,18 @@ t.equal(brokeStraightAway.map(\.kind), [.failed], "nowy deploy od razu w błędz
 var e20 = NotificationEngine()
 let baselineBuilding = e20.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
 t.equal(baselineBuilding, [], "build zastany przy pierwszym odpytaniu nie melduje startu")
+
+// Ten sam build w kolejnych cyklach też milczy — bez `isNewDeployment` w regule startu
+// aplikacja meldowałaby start builda, który użytkownik zastał już w toku.
+let stillBuilding = e20.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+t.equal(stillBuilding, [], "build zastany na starcie nie melduje startu przy kolejnym odpytaniu")
+
+// Regres stanu z cache'u API (ready → building przy tym samym id) nie cofa się do startu.
+var e21 = NotificationEngine()
+_ = e21.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+_ = e21.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .ready))])
+let regressed = e21.ingest(projects: [project("sklep", id: "p1", deploy: summary(id: "d1", state: .building))])
+t.equal(regressed, [], "regres ready → building nie melduje startu po fakcie")
 
 t.suite("NotificationEngine — dedup sukcesu po regresie stanu z API")
 var e15 = NotificationEngine()
@@ -782,7 +794,7 @@ let feedAPI = VercelAPI(token: "t", session: feedStub)
 
 let feed5 = try await RefreshCore.fetch(api: feedAPI, watchedProjectIDs: ["fp1", "fp2"], feedLimit: 5)
 t.equal(feed5.feed.map(\.id), ["d1a", "d2a", "d1b", "d2b", "d1c"],
-        "sześć deployów scalonych, posortowanych malejąco i przyciętych do 5 ŁĄCZNIE")
+        "najnowszy deploy obu projektów + historia do 5 pozycji, posortowane malejąco")
 t.equal(feed5.feed.map(\.projectName), ["sklep-online", "blog-firmowy", "sklep-online", "blog-firmowy", "sklep-online"],
         "każda pozycja niesie nazwę swojego projektu")
 t.equal(feed5.feed.map(\.projectID), ["fp1", "fp2", "fp1", "fp2", "fp1"], "pozycja niesie też id projektu")
@@ -793,7 +805,7 @@ t.equal(feed5.projects.first(where: { $0.id == "fp2" })?.latest?.id, "d2a", "to 
 t.equal(feed5.overall, .ready, "stan zbiorczy bez zmian — liczy się tylko najnowszy deploy projektu")
 
 let feed3 = try await RefreshCore.fetch(api: feedAPI, watchedProjectIDs: ["fp1", "fp2"], feedLimit: 3)
-t.equal(feed3.feed.map(\.id), ["d1a", "d2a", "d1b"], "limit 3 przycina feed do trzech pozycji")
+t.equal(feed3.feed.map(\.id), ["d1a", "d2a", "d1b"], "limit 3 zostawia miejsce na jedną pozycję historii")
 
 let feedDefault = try await RefreshCore.fetch(api: feedAPI, watchedProjectIDs: ["fp1", "fp2"])
 t.equal(feedDefault.feed.count, 5, "domyślny feedLimit to 5")
@@ -805,6 +817,51 @@ t.check(feedHole.projects.first(where: { $0.id == "fp3" })?.latest == nil, "…z
 
 let feedNone = try await RefreshCore.fetch(api: feedAPI, watchedProjectIDs: [], feedLimit: 5)
 t.equal(feedNone.feed.count, 0, "brak obserwowanych → pusty feed")
+
+t.suite("RefreshCore — każdy projekt ma gwarantowany wiersz")
+// Projekt padnięty dwa dni temu przegrywał globalne przycięcie z projektami wdrażanymi dziś:
+// ikona świeciła na czerwono, nagłówek meldował „1 deploy padł", a w popoverze nie było czego kliknąć.
+let guardStub = StubSession(runner: t)
+let guardBase = 1_754_470_000_000.0
+guardStub.responses["/v9/projects"] = (200, Data("""
+{"projects":[{"id":"gp1","name":"padniety"},{"id":"gp2","name":"alfa"},\
+{"id":"gp3","name":"beta"},{"id":"gp4","name":"gamma"}]}
+""".utf8))
+func guardDeploy(_ uid: String, _ state: String, offsetSeconds: Double) -> String {
+    #"{"uid":"\#(uid)","state":"\#(state)","createdAt":\#(Int(guardBase + offsetSeconds * 1000))}"#
+}
+guardStub.responses["projectId=gp1"] = (200, Data("""
+{"deployments":[\(guardDeploy("e1", "ERROR", offsetSeconds: -172_800)),\
+\(guardDeploy("e2", "READY", offsetSeconds: -259_200))]}
+""".utf8))
+guardStub.responses["projectId=gp2"] = (200, Data("""
+{"deployments":[\(guardDeploy("a1", "READY", offsetSeconds: 0)),\
+\(guardDeploy("a2", "READY", offsetSeconds: -100))]}
+""".utf8))
+guardStub.responses["projectId=gp3"] = (200, Data("""
+{"deployments":[\(guardDeploy("b1", "READY", offsetSeconds: -10)),\
+\(guardDeploy("b2", "READY", offsetSeconds: -200))]}
+""".utf8))
+guardStub.responses["projectId=gp4"] = (200, Data("""
+{"deployments":[\(guardDeploy("g1", "READY", offsetSeconds: -20)),\
+\(guardDeploy("g2", "READY", offsetSeconds: -300))]}
+""".utf8))
+let guardAPI = VercelAPI(token: "t", session: guardStub)
+let guardIDs: Set<String> = ["gp1", "gp2", "gp3", "gp4"]
+
+let tight = try await RefreshCore.fetch(api: guardAPI, watchedProjectIDs: guardIDs, feedLimit: 3)
+t.equal(tight.overall, .error, "agregat melduje błąd")
+t.check(tight.feed.contains { $0.projectID == "gp1" }, "padnięty projekt jest w feedzie mimo limitu 3")
+t.equal(tight.feed.map(\.id), ["a1", "b1", "g1", "e1"],
+        "cztery projekty → cztery wiersze; limit ustępuje gwarancji")
+t.equal(Set(tight.feed.map(\.projectID)).count, tight.feed.count,
+        "żaden projekt nie zajmuje drugiego wiersza, zanim każdy dostanie pierwszy")
+
+let roomy = try await RefreshCore.fetch(api: guardAPI, watchedProjectIDs: guardIDs, feedLimit: 10)
+t.equal(roomy.feed.map(\.id), ["a1", "b1", "g1", "a2", "b2", "g2", "e1", "e2"],
+        "przy zapasie miejsca historia dopełnia listę po najnowszych każdego projektu")
+t.check(roomy.feed.contains { $0.id == "e1" } && roomy.feed.contains { $0.id == "e2" },
+        "historia padniętego projektu też wchodzi")
 
 t.suite("RefreshCore — remisy i brak createdAt w feedzie")
 // Task group kończy się w losowej kolejności, więc remis po createdAt i pozycje bez daty

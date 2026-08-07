@@ -129,7 +129,7 @@ public struct L10n: Sendable {
         t("Połącz konto w zakładce Konto.", "Connect your account in the Account tab.")
     }
 
-    public var feedLimitLabel: String { t("Pozycje na liście", "List items") }
+    public var feedLimitLabel: String { t("Historia deployów", "Deploy history") }
     public var launchAtLogin: String { t("Uruchamiaj przy logowaniu", "Launch at login") }
     public var notifySuccess: String { t("Powiadamiaj o sukcesach", "Notify on successful deploys") }
     public var notifyFailure: String { t("Powiadamiaj o błędach", "Notify on failed deploys") }

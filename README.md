@@ -9,7 +9,7 @@ A small triangle sits in your menu bar and shows the state of your deploys at a 
 ## Features
 
 - ✅ **Live status triangle** in the menu bar: green / pulsing blue / red / gray, driven by the worst state among your watched projects
-- ✅ **Deploy feed** with the last 3, 5 or 10 deploys across your projects: branch, commit message, relative time and a build timer that ticks every second while a build runs
+- ✅ **Deploy feed**: every watched project keeps a row for its latest deploy, and older deploys fill the list to a depth you pick — 3, 5 or 10. Each row shows branch, commit message, relative time and a build timer that ticks every second while a build runs
 - ✅ **Notifications with sound**: 🚀 when a deploy starts, ✅ when it ships (click opens the preview), ❌ when it fails (click opens the logs)
 - ✅ **Teams**: watch your personal account or any team you belong to
 - ✅ **Token lives in the Keychain**, never in a file
@@ -63,7 +63,7 @@ cd vercelbar
 # Run in place (dev mode; shows a Dock icon that the bundled app doesn't have)
 swift run vercelbar
 
-# Core test suite (283 tests)
+# Core test suite
 swift run vercelbar-tests
 ```
 
@@ -71,7 +71,7 @@ swift run vercelbar-tests
 
 VercelBar polls Vercel's REST API (`/v9/projects`, `/v6/deployments`) over HTTPS with your token, keeping at most four requests in flight. A pure notification engine turns state transitions into events and dedupes them per deployment, so a flapping API never notifies twice. The UI is plain SwiftUI with a `MenuBarExtra`; the token sits in the login keychain and gets cached in memory after the first read.
 
-Known limits: the project list caps at 100 entries (no pagination yet), and the deploy feed shows what the API returns for the projects you watch.
+Known limits: the project list caps at 100 entries (no pagination yet). Because every watched project is guaranteed a row, watching more projects than your history depth makes the feed longer than that number — the guarantee wins, so a red triangle always has something to click.
 
 ## Languages
 

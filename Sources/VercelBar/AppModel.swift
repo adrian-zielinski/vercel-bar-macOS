@@ -72,6 +72,7 @@ final class AppModel: ObservableObject {
         }
         do {
             let stored = try keychain.readToken()
+            cachedToken = stored // pierwszy cykl pętli nie wraca po ten sam token do pęku
             hasToken = stored != nil
             guard hasToken else { phase = .onboarding; return }
         } catch {
