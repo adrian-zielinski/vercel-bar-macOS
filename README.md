@@ -20,9 +20,17 @@ A small triangle sits in your menu bar and shows the state of your deploys at a 
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/popover.png" width="360" alt="VercelBar popover with the deploy feed">
-  <img src="docs/screenshots/settings.png" width="480" alt="VercelBar settings window">
+  <img src="docs/screenshots/popover.png" width="400" alt="VercelBar popover with the deploy feed">
+  <img src="docs/screenshots/settings.png" width="420" alt="VercelBar settings window">
 </p>
+
+Menu bar states, light and dark:
+
+<img src="docs/screenshots/menubar-states.png" alt="Menu bar icon states: ready, building, error, queued">
+
+Notifications:
+
+<img src="docs/screenshots/notifications.png" width="480" alt="Failure and success deploy notifications">
 
 ## Install
 

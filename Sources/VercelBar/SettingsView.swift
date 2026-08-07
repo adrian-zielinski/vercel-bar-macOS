@@ -47,6 +47,9 @@ struct SettingsView: View {
         // Wyższe niż makietowe 380: stopka urosła o wybór długości listy i czwarty przełącznik,
         // a przy 380 lista projektów schodziła do dwóch widocznych wierszy.
         .frame(width: 480, height: 442)
+        // Tytuł sceny Window AppKit potrafi zamrozić przy tworzeniu okna;
+        // navigationTitle na treści aktualizuje belkę na żywo przy zmianie języka.
+        .navigationTitle(l10n.settingsWindowTitle)
         .onAppear {
             notifySuccess = model.settings.notifySuccess
             notifyFailure = model.settings.notifyFailure
