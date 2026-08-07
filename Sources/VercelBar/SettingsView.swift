@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var notifySuccess = true
     @State private var notifyFailure = true
+    @State private var loginItemNeedsApproval = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,14 +61,11 @@ struct SettingsView: View {
                                     text: $tokenField)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 12))
-                        Button("Zapisz") {
-                            Task {
-                                let result = await model.connect(token: tokenField)
-                                connectProblem = result == .ok ? nil : result
-                                if result == .ok { tokenField = "" }
-                            }
-                        }
-                        .disabled(tokenField.isEmpty)
+                            // Czerwona podpowiedź dotyczy tokenu, który właśnie zniknął z pola.
+                            .onChange(of: tokenField) { _, _ in connectProblem = nil }
+                            .onSubmit { saveToken() }
+                        Button("Zapisz") { saveToken() }
+                            .disabled(tokenField.isEmpty)
                     }
                     Text(tokenHint)
                         .font(.system(size: 10.5))
@@ -106,6 +104,12 @@ struct SettingsView: View {
                     set: { model.selectTeam(id: $0.isEmpty ? nil : $0) }
                 )) {
                     Text("Konto osobiste").tag("")
+                    // Zanim lista zespołów dojedzie, Picker bez tej pozycji cofnąłby
+                    // zaznaczenie na „Konto osobiste" i skłamał o zakresie.
+                    if let current = model.settings.teamID,
+                       !model.teams.contains(where: { $0.id == current }) {
+                        Text("Zespół (\(String(current.prefix(12)))…)").tag(current)
+                    }
                     ForEach(model.teams) { Text($0.name).tag($0.id) }
                 }
                 .labelsHidden()
@@ -119,6 +123,15 @@ struct SettingsView: View {
         case .rejected: "Vercel odrzucił ten token. Sprawdź, czy skopiowany w całości."
         case .keychainFailure: "Token poprawny, ale zapis w pęku kluczy się nie powiódł. Otwórz Keychain Access i sprawdź dostęp."
         default: "Token z panelu Vercela → Account Settings → Tokens. Zakres: tylko odczyt."
+        }
+    }
+
+    private func saveToken() {
+        guard !tokenField.isEmpty else { return }
+        Task {
+            let result = await model.connect(token: tokenField)
+            connectProblem = result == .ok ? nil : result
+            if result == .ok { tokenField = "" }
         }
     }
 
@@ -197,6 +210,12 @@ struct SettingsView: View {
             footerToggle("Uruchamiaj przy logowaniu", isOn: $launchAtLogin)
             footerToggle("Powiadamiaj o sukcesach", isOn: $notifySuccess)
             footerToggle("Powiadamiaj o błędach", isOn: $notifyFailure)
+            if loginItemNeedsApproval {
+                Text("Zatwierdź w Ustawieniach systemowych → Elementy logowania")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(EdgeInsets(top: 11, leading: 22, bottom: 14, trailing: 22))
         .onChange(of: launchAtLogin) { _, on in setLaunchAtLogin(on) }
@@ -221,10 +240,18 @@ struct SettingsView: View {
         // SMAppService działa tylko w bundlu .app; przy `swift run` cicho ignorujemy.
         guard Bundle.main.bundleIdentifier != nil else { return }
         do {
-            if enabled { try SMAppService.mainApp.register() }
-            else { try SMAppService.mainApp.unregister() }
+            if enabled {
+                try SMAppService.mainApp.register()
+                // Rejestracja się udała, ale macOS trzyma element wyłączony do czasu
+                // zatwierdzenia przez użytkownika — bez podpowiedzi wygląda na awarię.
+                loginItemNeedsApproval = SMAppService.mainApp.status == .requiresApproval
+            } else {
+                try SMAppService.mainApp.unregister()
+                loginItemNeedsApproval = false
+            }
         } catch {
             launchAtLogin = SMAppService.mainApp.status == .enabled
+            loginItemNeedsApproval = false
         }
     }
 }

@@ -71,18 +71,16 @@ struct PopoverView: View {
 
     private var onboarding: some View {
         VStack(spacing: 12) {
-            Image(nsImage: StatusIconRenderer.image(state: .idle))
-                .resizable().frame(width: 26, height: 23)
-                .opacity(0.4)
+            TriangleShape()
+                .fill(Color(nsColor: Theme.onboardingLogo))
+                .frame(width: 26, height: 23)
             Text("Połącz konto Vercela, aby widzieć swoje deploye w pasku menu.")
                 .font(.system(size: 12.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .lineSpacing(3)
                 .frame(maxWidth: 232)
-            Button("Połącz z Vercelem") { openSettings() }
-                .buttonStyle(.borderedProminent)
-                .tint(.primary)
-                .controlSize(.regular)
+            actionButton("Połącz z Vercelem")
         }
         .padding(EdgeInsets(top: 30, leading: 26, bottom: 26, trailing: 26))
     }
@@ -96,6 +94,7 @@ struct PopoverView: View {
                 .font(.system(size: 12.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .lineSpacing(3)
                 .frame(maxWidth: 236)
         }
         .padding(EdgeInsets(top: 26, leading: 30, bottom: 24, trailing: 30))
@@ -110,10 +109,9 @@ struct PopoverView: View {
                 .font(.system(size: 12.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .lineSpacing(3)
                 .frame(maxWidth: 236)
-            Button("Otwórz Ustawienia") { openSettings() }
-                .buttonStyle(.borderedProminent)
-                .tint(.primary)
+            actionButton("Otwórz Ustawienia")
         }
         .padding(EdgeInsets(top: 26, leading: 26, bottom: 24, trailing: 26))
     }
@@ -123,7 +121,22 @@ struct PopoverView: View {
             .font(.system(size: 12.5))
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
+            .lineSpacing(3)
             .padding(EdgeInsets(top: 26, leading: 30, bottom: 24, trailing: 30))
+    }
+
+    /// Przycisk wiodący wariantów: `.borderedProminent` + `.tint(.primary)` nie daje
+    /// makietowej pary czarny/biały, więc kolory bierzemy wprost z Theme.
+    private func actionButton(_ title: String) -> some View {
+        Button(action: { openSettings() }) {
+            Text(title)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Color(nsColor: Theme.actionFg))
+                .padding(.horizontal, 16).frame(height: 28)
+                .background(Color(nsColor: Theme.actionBg))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: stopka
@@ -154,10 +167,22 @@ struct PopoverView: View {
         .buttonStyle(FooterButtonStyle())
     }
 
+    // Listy projektów nie dociągamy tutaj — robi to `SettingsView.onAppear`.
     private func openSettings() {
         openWindow(id: "settings")
         NSApp.activate(ignoringOtherApps: true)
-        Task { await model.loadAllProjects() }
+    }
+}
+
+/// Trójkąt logo (proporcje viewBox 26×23 z makiet).
+struct TriangleShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.closeSubpath()
+        return p
     }
 }
 

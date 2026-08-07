@@ -7,8 +7,11 @@ zgłaszają padnięte i ukończone deploye.
 
 ## Instalacja
 
-1. Zbuduj: `./Scripts/build-app.sh` (wymaga Swift toolchain / Command Line Tools).
-2. Przenieś `build/VercelBar.app` do Programów.
+1. Zbuduj: `./Scripts/build-app.sh` (wymaga Swift 6+ — Command Line Tools z Xcode 16
+   lub nowszego).
+2. Rozpakuj `build/VercelBar.zip` (dwuklik) i przenieś `VercelBar.app` do Programów.
+   (Nie kopiuj `build/VercelBar.app` bezpośrednio — iCloud dokleja mu atrybuty,
+   które psują pieczęć podpisu.)
 3. Przy pierwszym uruchomieniu: prawy przycisk → Otwórz (aplikacja bez płatnego
    podpisu Apple).
 

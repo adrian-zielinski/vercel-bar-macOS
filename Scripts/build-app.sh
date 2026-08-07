@@ -13,7 +13,7 @@ VERSION="1.0.0"
 OUT_DIR="$ROOT/build"
 STAGE_ROOT="$(mktemp -d)"
 STAGE="$STAGE_ROOT/$APP_NAME.app"
-trap 'rm -rf "$STAGE_ROOT"' EXIT   # sprzątaj staging także po błędzie kompilacji
+trap 'rm -rf "$STAGE_ROOT"' EXIT INT TERM   # sprzątaj staging po błędzie kompilacji i po przerwaniu
 
 if [ ! -f "$ROOT/Resources/AppIcon.icns" ]; then
     echo "▸ Generuję ikonę..."
@@ -69,7 +69,9 @@ echo "▸ Pakowanie do $OUT_DIR ..."
 mkdir -p "$OUT_DIR"
 rm -rf "$OUT_DIR/$APP_NAME.app" "$OUT_DIR/$APP_NAME.zip"
 ditto "$STAGE" "$OUT_DIR/$APP_NAME.app"
-ditto -c -k --keepParent "$STAGE" "$OUT_DIR/$APP_NAME.zip"
+# --sequesterRsrc: bez tego zwykły `unzip` materializuje pliki AppleDouble (._*)
+# wewnątrz bundla i psuje pieczęć podpisu.
+ditto -c -k --sequesterRsrc --keepParent "$STAGE" "$OUT_DIR/$APP_NAME.zip"
 
 # Kopia w build/ leży w iCloud i przy kopiowaniu dostaje com.apple.FinderInfo oraz
 # com.apple.fileprovider.* — z nimi `codesign --verify` odmawia. Czyścimy (bez twardej

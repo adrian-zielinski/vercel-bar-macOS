@@ -42,6 +42,7 @@ final class AppModel: ObservableObject {
     private var consecutiveFailures = 0 // backoff dla 429/5xx
     private var keychainReadFailures = 0 // pojedyncza czkawka pęku ≠ utrata sesji
     private var refreshInFlight = false
+    private var refreshQueued = false
 
     var iconState: AggregateState {
         switch phase {
@@ -88,12 +89,21 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Osłona przed reentrancją: pętla + przycisk Odśwież + didWake mogą się nałożyć,
+    /// a starsza migawka podana do ingest po nowszej wystrzeliłaby stare zdarzenia.
     func refresh() async {
-        // Osłona przed reentrancją: pętla + przycisk Odśwież + didWake mogą się nałożyć,
-        // a starsza migawka podana do ingest po nowszej wystrzeliłaby stare zdarzenia.
-        guard !refreshInFlight else { return }
+        // Koalescencja: żądanie w trakcie trwającego cyklu wykona się zaraz po nim,
+        // zamiast ginąć (toggle projektu, przycisk Odśwież, didWake).
+        if refreshInFlight { refreshQueued = true; return }
         refreshInFlight = true
-        defer { refreshInFlight = false }
+        repeat {
+            refreshQueued = false
+            await performRefresh()
+        } while refreshQueued
+        refreshInFlight = false
+    }
+
+    private func performRefresh() async {
         // SecItemCopyMatching jest synchroniczne i przy systemowym promptcie potrafi stanąć
         // na kilka sekund — na MainActorze zamroziłoby ikonę paska menu.
         let kc = keychain
