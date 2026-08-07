@@ -169,6 +169,19 @@ public struct L10n: Sendable {
           "The update failed. The release page is open in your browser.")
     }
 
+    /// Paczka dojechała, ale nie nadaje się do instalacji — to wina wydania, nie komputera.
+    public var updateDamaged: String {
+        t("Paczka aktualizacji jest uszkodzona. Otworzyłem stronę wydania.",
+          "The update package is damaged. The release page is open in your browser.")
+    }
+
+    /// Wynik ręcznego sprawdzenia w Ustawieniach, gdy coś się znalazło — sam pasek
+    /// z przyciskiem siedzi w popoverze, więc tutaj kierujemy tam wzrok.
+    public func updateFound(version: String) -> String {
+        t("Znaleziono wersję \(version) — zobacz w pasku menu",
+          "Found version \(version) — see the menu bar")
+    }
+
     public var checkForUpdates: String { t("Sprawdź aktualizacje", "Check for updates") }
     public var upToDate: String { t("Masz najnowszą wersję", "You're up to date") }
 

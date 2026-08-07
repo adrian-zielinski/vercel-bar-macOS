@@ -9,7 +9,7 @@ cd "$ROOT"
 
 APP_NAME="VercelBar"
 BUNDLE_ID="pl.zielinski.vercelbar"
-VERSION="1.2.0"
+VERSION="1.2.1"
 OUT_DIR="$ROOT/build"
 STAGE_ROOT="$(mktemp -d)"
 STAGE="$STAGE_ROOT/$APP_NAME.app"

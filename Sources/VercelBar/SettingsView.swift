@@ -22,7 +22,7 @@ struct SettingsView: View {
     @State private var notifyStart = true
     @State private var loginItemNeedsApproval = SMAppService.mainApp.status == .requiresApproval
     @State private var checkingUpdates = false
-    @State private var showUpToDate = false
+    @State private var checkResult: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -156,10 +156,11 @@ struct SettingsView: View {
                             .disabled(checkingUpdates)
                         if checkingUpdates {
                             ProgressView().controlSize(.small)
-                        } else if showUpToDate {
-                            Text(l10n.upToDate)
+                        } else if let checkResult {
+                            Text(checkResult)
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -167,15 +168,17 @@ struct SettingsView: View {
         }
     }
 
-    /// Wynik ręcznego sprawdzenia: znalezioną wersję pokazuje pasek w popoverze,
-    /// więc tutaj zostaje tylko potwierdzenie, że nic nie czeka.
+    /// Wynik ręcznego sprawdzenia. Przy trafieniu kieruje wzrok do paska w popoverze —
+    /// bez tego spinner znika i użytkownik nie wie, czy cokolwiek się wydarzyło.
     private func runUpdateCheck() {
         checkingUpdates = true
-        showUpToDate = false
+        checkResult = nil
         Task {
             let found = await model.checkForUpdate()
             checkingUpdates = false
-            showUpToDate = !found
+            checkResult = found
+                ? l10n.updateFound(version: model.availableUpdate?.version ?? "")
+                : l10n.upToDate
         }
     }
 

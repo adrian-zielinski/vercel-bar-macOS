@@ -106,9 +106,10 @@ public enum UpdateChecker {
         // Paczka podmieni działającą aplikację, więc bierzemy ją wyłącznie po HTTPS —
         // nawet gdyby odpowiedź API kiedyś wskazała inaczej.
         guard zipURL.scheme == "https", releaseURL.scheme == "https" else { return nil }
-        // Wersja bez prefiksu „v" — trafia wprost do tekstu w UI i do weryfikacji Info.plist.
-        let version = release.tagName.hasPrefix("v") ? String(release.tagName.dropFirst())
-                                                     : release.tagName
+        // Wersja znormalizowana (bez „v", bez białych znaków, same człony liczbowe) —
+        // trafia wprost do tekstu w UI i do porównania z Info.plist w paczce.
+        guard let parts = SemVer.parse(release.tagName) else { return nil }
+        let version = parts.map(String.init).joined(separator: ".")
         return UpdateInfo(version: version, zipURL: zipURL, releaseURL: releaseURL)
     }
 

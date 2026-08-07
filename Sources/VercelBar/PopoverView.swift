@@ -159,13 +159,13 @@ struct PopoverView: View {
                 .foregroundStyle(Color(nsColor: updateAccent))
             Text(updateText)
                 .font(.system(size: 11.5))
-                .foregroundStyle(model.updateState == .failed ? .secondary : .primary)
+                .foregroundStyle(updateFailedState ? .secondary : .primary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 6)
             // Po porażce przycisk zostaje: druga próba bywa udana (zamknięty Finder,
             // odblokowany katalog), a bez niego jedynym wyjściem jest ręczne pobranie.
-            if model.updateState == .idle || model.updateState == .failed {
+            if model.updateState != .downloading && model.updateState != .installing {
                 Button(action: { model.installUpdate() }) {
                     Text(l10n.updateInstallButton)
                         .font(.system(size: 11, weight: .semibold))
@@ -186,16 +186,21 @@ struct PopoverView: View {
         case .downloading: l10n.updateDownloading
         case .installing: l10n.updateInstalling
         case .failed: l10n.updateFailed
+        case .damaged: l10n.updateDamaged
         case .idle: l10n.updateAvailable(version: model.availableUpdate?.version ?? "")
         }
     }
 
+    private var updateFailedState: Bool {
+        model.updateState == .failed || model.updateState == .damaged
+    }
+
     private var updateSymbol: String {
-        model.updateState == .failed ? "exclamationmark.triangle" : "arrow.down.circle"
+        updateFailedState ? "exclamationmark.triangle" : "arrow.down.circle"
     }
 
     private var updateAccent: NSColor {
-        model.updateState == .failed ? Theme.error : Theme.building
+        updateFailedState ? Theme.error : Theme.building
     }
 
     // MARK: stopka

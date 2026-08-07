@@ -316,6 +316,13 @@ final class AppModel: ObservableObject {
         updateTimer = Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.checkForUpdate() }
         }
+        // Godzina luzu: sprawdzenie aktualizacji nie musi budzić procesora co do sekundy.
+        updateTimer?.tolerance = 60 * 60
+    }
+
+    deinit {
+        updateTimer?.invalidate()
+        pulseTimer?.invalidate()
     }
 
     /// Zwraca, czy czeka nowsza wersja — Ustawienia pokazują na tej podstawie „Masz najnowszą wersję".
@@ -324,17 +331,30 @@ final class AppModel: ObservableObject {
         guard let currentVersion else { return false }
         // W trakcie pobierania/instalacji nie ruszaj baneru — timer dobowy nie ma prawa
         // zabrać spod palców wydania, które właśnie się instaluje.
-        guard updateState == .idle || updateState == .failed else { return availableUpdate != nil }
+        guard updateIdle else { return availableUpdate != nil }
         // Nil znaczy „nic nowego albo nie udało się sprawdzić" — w obu przypadkach
         // stary baner ma zniknąć, bo wydanie mogło zostać wycofane.
         let found = await UpdateChecker.checkForUpdate(currentVersion: currentVersion)
+        // Nowe wydanie zasługuje na czysty pasek: komunikat o porażce dotyczył wersji,
+        // której już nie proponujemy. Bez tego „nie udało się" wisi do restartu aplikacji.
+        if updateState != .idle, found?.version != availableUpdate?.version { updateState = .idle }
         availableUpdate = found
         return found != nil
     }
 
+    /// Stan, z którego wolno ruszyć instalację: nic nie trwa. Po porażce próba drugi raz
+    /// bywa udana (zwolniony katalog, wznowiona sieć), więc te stany też przepuszczamy.
+    private var updateIdle: Bool {
+        updateState == .idle || updateState == .failed || updateState == .damaged
+    }
+
     func installUpdate() {
         guard let update = availableUpdate else { return }
-        guard updateState == .idle || updateState == .failed else { return } // bez podwójnego kliknięcia
+        guard updateIdle else { return }
+        // Stan ustawiany synchronicznie, jeszcze przed Taskiem: między powrotem z tej metody
+        // a pierwszym `onState` jest hop MainActora, w który wchodzi drugie kliknięcie —
+        // a dwie instalacje naraz potrafią ubić się nawzajem w środku podmiany.
+        updateState = .downloading
         Task {
             await UpdateInstaller.install(update) { [weak self] state in
                 self?.updateState = state

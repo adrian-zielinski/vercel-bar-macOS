@@ -7,8 +7,22 @@ public enum UpdateInstallError: Error, Equatable, Sendable {
     case infoPlistUnreadable
     case identifierMismatch(String?)
     case versionMismatch(String?)
+    case executableMissing
+    case signatureInvalid
     case destinationNotWritable
     case replaceFailed
+
+    /// Paczka dojechała, ale jej zawartość jest nie do użytku — UI mówi o tym wprost,
+    /// bo to co innego niż brak praw zapisu czy zerwane pobieranie.
+    public var meansDamagedPackage: Bool {
+        switch self {
+        case .unpackFailed, .bundleMissing, .infoPlistUnreadable,
+             .identifierMismatch, .versionMismatch, .executableMissing, .signatureInvalid:
+            return true
+        case .downloadFailed, .destinationNotWritable, .replaceFailed:
+            return false
+        }
+    }
 }
 
 /// Operacje na plikach przy aktualizacji: rozpakowanie paczki, weryfikacja bundla
@@ -76,6 +90,12 @@ public enum UpdateInstallEngine {
               FileManager.default.fileExists(atPath: plist.path) else {
             throw UpdateInstallError.bundleMissing
         }
+        // `fileExists` podąża za dowiązaniem, więc symlink przeszedłby jako katalog i został
+        // zainstalowany jako symlink. `attributesOfItem` używa lstat i widzi prawdę.
+        if let type = (try? FileManager.default.attributesOfItem(atPath: bundle.path))?[.type]
+            as? FileAttributeType, type == .typeSymbolicLink {
+            throw UpdateInstallError.bundleMissing
+        }
         guard let data = try? Data(contentsOf: plist),
               let info = try? PropertyListSerialization.propertyList(from: data, format: nil)
                 as? [String: Any] else {
@@ -89,14 +109,33 @@ public enum UpdateInstallEngine {
         guard let version, SemVer.equals(version, expectedVersion) else {
             throw UpdateInstallError.versionMismatch(version)
         }
+
+        // Info.plist to za mało: paczka bywa obcięta albo pusta w środku, a wtedy podmiana
+        // kończy się aplikacją, która nie startuje — ze starą już w koszu.
+        let executable = (info["CFBundleExecutable"] as? String) ?? "VercelBar"
+        guard FileManager.default.isExecutableFile(
+                atPath: bundle.appendingPathComponent("Contents/MacOS/\(executable)").path) else {
+            throw UpdateInstallError.executableMissing
+        }
+
+        // Pieczęć podpisu ad-hoc obejmuje każdy plik bundla, więc `codesign --verify` wyłapie
+        // obcięcie, uszkodzenie i podmianę pojedynczego zasobu. To samo polecenie, którym
+        // `Scripts/build-app.sh` przyjmuje paczkę przed wrzuceniem na wydanie.
+        guard run("/usr/bin/codesign", ["--verify", "--deep", "--strict", bundle.path]) == 0 else {
+            throw UpdateInstallError.signatureInvalid
+        }
         return bundle
     }
 
     // MARK: podmiana
 
-    /// Podmiana atomowa na tyle, na ile pozwala system plików: najpierw stary bundel znika
-    /// z miejsca docelowego, potem wchodzi nowy. Gdy wejście nowego padnie, stary wraca —
-    /// żadnego stanu „aplikacja zniknęła".
+    /// Podmiana z jak najkrótszym oknem, w którym pod ścieżką docelową nie ma aplikacji.
+    ///
+    /// Nowy bundel ląduje najpierw OBOK celu, na tym samym woluminie: kosztowne kopiowanie
+    /// dzieje się, gdy stara wersja jeszcze stoi na miejscu, a krok niszczący to jedno
+    /// `rename()`. Bez tego `moveItem` z katalogu tymczasowego degraduje się na innym
+    /// woluminie (dysk zewnętrzny, druga partycja) do kopiowania, które przerwane w połowie
+    /// zostawia ogryzek pod ścieżką docelową — i wtedy stara wersja nie ma dokąd wrócić.
     ///
     /// `moveOldToTrash: false` używane w testach: atrapa nie ma po co lądować w koszu użytkownika.
     public static func replace(destination: URL,
@@ -109,21 +148,48 @@ public enum UpdateInstallEngine {
             throw UpdateInstallError.destinationNotWritable
         }
 
+        // `ditto`, bo tylko ono kopiuje bundel bez naruszenia pieczęci podpisu.
+        let staged = parent.appendingPathComponent(".\(bundleName).new-\(UUID().uuidString)")
+        try? fm.removeItem(at: staged)
+        guard run("/usr/bin/ditto", [newBundle.path, staged.path]) == 0 else {
+            try? fm.removeItem(at: staged)
+            throw UpdateInstallError.replaceFailed
+        }
+
         var retired: URL?
         if fm.fileExists(atPath: destination.path) {
             guard fm.isWritableFile(atPath: destination.path) else {
+                try? fm.removeItem(at: staged)
                 throw UpdateInstallError.destinationNotWritable
             }
-            retired = try retire(destination, workDirectory: workDirectory, useTrash: moveOldToTrash)
+            do {
+                retired = try retire(destination, workDirectory: workDirectory, useTrash: moveOldToTrash)
+            } catch {
+                try? fm.removeItem(at: staged)
+                throw error
+            }
         }
+        return try commitReplacement(staged: staged, destination: destination, retired: retired)
+    }
 
+    /// Ostatni krok podmiany, wydzielony, bo to jedyne miejsce, w którym pod ścieżką docelową
+    /// może chwilowo nie być aplikacji — i jedyne, które trzeba umieć przetestować wprost.
+    /// Gdy wejście nowej wersji padnie, `retired` wraca na miejsce.
+    @discardableResult
+    public static func commitReplacement(staged: URL,
+                                         destination: URL,
+                                         retired: URL?) throws -> Outcome {
+        let fm = FileManager.default
         do {
-            try fm.moveItem(at: newBundle, to: destination)
+            try fm.moveItem(at: staged, to: destination)
         } catch {
-            // Miejsce docelowe zostało puste — oddaj starą wersję, zanim zgłosisz porażkę.
-            if let retired, !fm.fileExists(atPath: destination.path) {
+            // Ogryzek sprzątamy tylko wtedy, gdy mamy co przywrócić: bez `retired` pod
+            // ścieżką docelową może stać cudza aplikacja, której nie wolno nam skasować.
+            if let retired {
+                try? fm.removeItem(at: destination)
                 try? fm.moveItem(at: retired, to: destination)
             }
+            try? fm.removeItem(at: staged)
             throw UpdateInstallError.replaceFailed
         }
         return Outcome(installed: destination, retiredOld: retired)
@@ -171,6 +237,11 @@ public enum UpdateInstallEngine {
     public static func restartShellCommand(pid: Int32, destination: URL) -> String {
         // Ścieżka w apostrofach; apostrof w nazwie katalogu zamykamy i doklejamy jako literał.
         let quoted = "'" + destination.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
-        return "while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done; open \(quoted)"
+        // Czekanie ograniczone do 30 s: gdyby proces nie zniknął albo pid trafił do ponownego
+        // użycia, powłoka odpala nową wersję zamiast wisieć bez końca. Trzy podejścia do
+        // `open`, bo LaunchServices bywa zajęte tuż po podmianie bundla pod tą samą ścieżką.
+        // Ostatnia deska ratunku: pokaż aplikację w Finderze, żeby użytkownik wiedział, gdzie stoi.
+        return "n=0; while kill -0 \(pid) 2>/dev/null && [ $n -lt 150 ]; do sleep 0.2; n=$((n+1)); done; "
+             + "for i in 1 2 3; do open \(quoted) && exit 0; sleep 1; done; open -R \(quoted)"
     }
 }

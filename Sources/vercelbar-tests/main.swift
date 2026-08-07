@@ -361,6 +361,14 @@ t.equal(plTexts.upToDate, "Masz najnowszą wersję", "potwierdzenie aktualności
 t.equal(enTexts.upToDate, "You're up to date", "potwierdzenie aktualności po angielsku")
 t.equal(plTexts.versionLabel(version: "1.1.0"), "Wersja 1.1.0", "etykieta wersji po polsku")
 t.equal(enTexts.versionLabel(version: "1.1.0"), "Version 1.1.0", "etykieta wersji po angielsku")
+t.equal(plTexts.updateFound(version: "1.2.1"), "Znaleziono wersję 1.2.1 — zobacz w pasku menu",
+        "wynik ręcznego sprawdzenia po polsku")
+t.equal(enTexts.updateFound(version: "1.2.1"), "Found version 1.2.1 — see the menu bar",
+        "wynik ręcznego sprawdzenia po angielsku")
+t.equal(plTexts.updateDamaged, "Paczka aktualizacji jest uszkodzona. Otworzyłem stronę wydania.",
+        "komunikat uszkodzonej paczki po polsku")
+t.equal(enTexts.updateDamaged, "The update package is damaged. The release page is open in your browser.",
+        "komunikat uszkodzonej paczki po angielsku")
 
 // MARK: - Silnik powiadomień
 
@@ -1105,6 +1113,17 @@ do {
                                                  currentVersion: "1.1.0")?.version, "1.2.0",
             "tag bez prefiksu też przechodzi")
 
+    // Wersja z tagu trafia wprost do paska, więc idzie do UI znormalizowana.
+    // `\\n` jest tu escape'em JSON-a (w tagu ląduje prawdziwy znak nowej linii), nie Swifta.
+    for tag in ["V1.3.0", " 1.3.0\\n", "1.03.0", "v1.3.0"] {
+        t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: tag),
+                                                     currentVersion: "1.1.0")?.version, "1.3.0",
+                "tag \(tag.debugDescription) daje wersję 1.3.0")
+    }
+    t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "nightly"),
+                                                 currentVersion: "1.1.0"), nil,
+            "tag nieliczbowy → brak aktualizacji")
+
     let overHTTP = Data("""
     {"tag_name":"v1.2.0","html_url":"https://github.com/adrian-zielinski/vercelbar/releases/tag/v1.2.0",
      "draft":false,"prerelease":false,
@@ -1172,8 +1191,21 @@ t.equal(await UpdateChecker.checkForUpdate(session: garbage, currentVersion: "1.
 
 // MARK: - Aktualizacje: podmiana bundla na atrapie
 
-/// Atrapa aplikacji: katalog `.app` z samym Info.plist i pustą binarką.
-/// Testy nigdy nie dotykają prawdziwego VercelBar.app ani kosza użytkownika.
+@discardableResult
+func shell(_ executable: String, _ arguments: [String]) -> Int32 {
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: executable)
+    p.arguments = arguments
+    p.standardOutput = FileHandle.nullDevice
+    p.standardError = FileHandle.nullDevice
+    guard (try? p.run()) != nil else { return -1 }
+    p.waitUntilExit()
+    return p.terminationStatus
+}
+
+/// Atrapa aplikacji: katalog `.app` z Info.plist, wykonywalną atrapą binarki i podpisem
+/// ad-hoc — silnik wymaga nienaruszonej pieczęci, więc fikstura musi być podpisana jak
+/// prawdziwa paczka. Testy nigdy nie dotykają prawdziwego VercelBar.app ani kosza użytkownika.
 func makeFakeApp(at url: URL, version: String, bundleID: String) throws {
     let fm = FileManager.default
     try fm.createDirectory(at: url.appendingPathComponent("Contents/MacOS"),
@@ -1184,7 +1216,12 @@ func makeFakeApp(at url: URL, version: String, bundleID: String) throws {
                                 "CFBundleExecutable": "VercelBar"]
     try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
         .write(to: url.appendingPathComponent("Contents/Info.plist"))
-    try Data("atrapa".utf8).write(to: url.appendingPathComponent("Contents/MacOS/VercelBar"))
+    let executable = url.appendingPathComponent("Contents/MacOS/VercelBar")
+    try Data("atrapa".utf8).write(to: executable)
+    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+    if shell("/usr/bin/codesign", ["--force", "--sign", "-", url.path]) != 0 {
+        t.check(false, "nie udało się podpisać atrapy \(url.lastPathComponent)")
+    }
 }
 
 func zipApp(_ app: URL, to zip: URL) -> Bool {
@@ -1234,8 +1271,11 @@ do {
     } else {
         t.check(false, "brak informacji, gdzie trafiła stara wersja")
     }
-    t.check(!fm.fileExists(atPath: work.appendingPathComponent("unpacked/VercelBar.app").path),
-            "rozpakowany bundel został przeniesiony, nie skopiowany")
+    t.check(((try? fm.contentsOfDirectory(atPath: dest.deletingLastPathComponent().path)) ?? [])
+                == ["VercelBar.app"],
+            "po udanej podmianie obok celu nie zostaje nic poza aplikacją")
+    t.check(shell("/usr/bin/codesign", ["--verify", "--strict", dest.path]) == 0,
+            "podpis nowej wersji przeżywa podmianę")
 
     // Scenariusz 2: obcy bundle id — fallback bez podmiany.
     let dest2 = updRoot.appendingPathComponent("Applications2/VercelBar.app")
@@ -1289,6 +1329,122 @@ do {
         t.check(false, "oczekiwano bundleMissing, jest: \(error)")
     }
     t.equal(bundleVersion(at: dest2), "1.1.0", "po odrzuconej paczce stara wersja nadal stoi")
+
+    // Scenariusz 5a: podmiana pada, zanim cokolwiek ruszy starą wersję.
+    // Kopiowanie nowego bundla idzie OBOK celu, więc porażka na tym etapie
+    // nie ma prawa dotknąć działającej aplikacji.
+    let dest5 = updRoot.appendingPathComponent("Applications5/VercelBar.app")
+    try makeFakeApp(at: dest5, version: "1.1.0", bundleID: "pl.zielinski.vercelbar")
+    let work5 = updRoot.appendingPathComponent("work5")
+    do {
+        _ = try UpdateInstallEngine.replace(destination: dest5,
+                                            with: updRoot.appendingPathComponent("nie-ma-mnie/VercelBar.app"),
+                                            workDirectory: work5, moveOldToTrash: false)
+        t.check(false, "podmiana nieistniejącym bundlem powinna paść")
+    } catch UpdateInstallError.replaceFailed {
+        t.check(true, "nieudane przygotowanie nowej wersji → replaceFailed")
+    } catch {
+        t.check(false, "oczekiwano replaceFailed, jest: \(error)")
+    }
+    t.equal(bundleVersion(at: dest5), "1.1.0", "porażka przed podmianą zostawia starą wersję na miejscu")
+    t.check(((try? fm.contentsOfDirectory(atPath: dest5.deletingLastPathComponent().path)) ?? [])
+                .allSatisfy { !$0.hasPrefix(".VercelBar.app.new-") },
+            "po porażce nie zostaje ogryzek stagingu obok celu")
+
+    // Scenariusz 5b: krok niszczący już się wykonał — stara wersja jest odstawiona,
+    // a wejście nowej pada. To jedyna ścieżka, na której `dest` może zostać pusty,
+    // więc ma własny test: rollback musi oddać starą wersję na miejsce.
+    let dest5b = updRoot.appendingPathComponent("Applications5b/VercelBar.app")
+    try makeFakeApp(at: dest5b, version: "1.1.0", bundleID: "pl.zielinski.vercelbar")
+    let retired5b = updRoot.appendingPathComponent("retired5b/VercelBar.app")
+    try fm.createDirectory(at: retired5b.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try fm.moveItem(at: dest5b, to: retired5b) // odpowiednik `retire`
+    do {
+        _ = try UpdateInstallEngine.commitReplacement(
+            staged: updRoot.appendingPathComponent("nie-ma-mnie/VercelBar.app"),
+            destination: dest5b,
+            retired: retired5b)
+        t.check(false, "wejście nieistniejącej wersji powinno paść")
+    } catch UpdateInstallError.replaceFailed {
+        t.check(true, "nieudane wejście nowej wersji → replaceFailed")
+    } catch {
+        t.check(false, "oczekiwano replaceFailed, jest: \(error)")
+    }
+    t.equal(bundleVersion(at: dest5b), "1.1.0", "rollback oddaje starą wersję na miejsce docelowe")
+    t.check(!fm.fileExists(atPath: retired5b.path), "po rollbacku nie zostaje osierocona kopia")
+
+    // Scenariusz 6: bundel bez pliku wykonywalnego — Info.plist to za mało.
+    let dest6 = updRoot.appendingPathComponent("Applications6/VercelBar.app")
+    try makeFakeApp(at: dest6, version: "1.1.0", bundleID: "pl.zielinski.vercelbar")
+    let hollow = updRoot.appendingPathComponent("hollow/VercelBar.app")
+    try makeFakeApp(at: hollow, version: "1.2.0", bundleID: "pl.zielinski.vercelbar")
+    try fm.removeItem(at: hollow.appendingPathComponent("Contents/MacOS"))
+    let hollowZip = updRoot.appendingPathComponent("Hollow.zip")
+    t.check(zipApp(hollow, to: hollowZip), "ditto spakował bundel bez binarki")
+    do {
+        _ = try UpdateInstallEngine.install(zip: hollowZip, destination: dest6,
+                                            expectedVersion: "1.2.0",
+                                            workDirectory: updRoot.appendingPathComponent("work6"),
+                                            moveOldToTrash: false)
+        t.check(false, "bundel bez binarki powinien wywrócić instalację")
+    } catch UpdateInstallError.executableMissing {
+        t.check(true, "bundel bez Contents/MacOS → executableMissing")
+    } catch {
+        t.check(false, "oczekiwano executableMissing, jest: \(error)")
+    }
+    t.equal(bundleVersion(at: dest6), "1.1.0", "pusty bundel nie rusza starej wersji")
+
+    // Scenariusz 7: dowiązanie udające bundel.
+    let linkDir = updRoot.appendingPathComponent("linked", isDirectory: true)
+    try fm.createDirectory(at: linkDir, withIntermediateDirectories: true)
+    let linkTarget = updRoot.appendingPathComponent("linkTarget/VercelBar.app")
+    try makeFakeApp(at: linkTarget, version: "1.2.0", bundleID: "pl.zielinski.vercelbar")
+    try fm.createSymbolicLink(at: linkDir.appendingPathComponent("VercelBar.app"),
+                              withDestinationURL: linkTarget)
+    do {
+        _ = try UpdateInstallEngine.verifiedBundle(in: linkDir, expectedVersion: "1.2.0")
+        t.check(false, "dowiązanie nie może udawać bundla")
+    } catch UpdateInstallError.bundleMissing {
+        t.check(true, "symlink zamiast VercelBar.app → bundleMissing")
+    } catch {
+        t.check(false, "oczekiwano bundleMissing, jest: \(error)")
+    }
+
+    // Scenariusz 7b: paczka naruszona po podpisaniu (obcięty upload, podmieniony zasób).
+    let tampered = updRoot.appendingPathComponent("tampered/VercelBar.app")
+    try makeFakeApp(at: tampered, version: "1.2.0", bundleID: "pl.zielinski.vercelbar")
+    try Data("co innego".utf8).write(to: tampered.appendingPathComponent("Contents/MacOS/VercelBar"))
+    do {
+        _ = try UpdateInstallEngine.verifiedBundle(in: tampered.deletingLastPathComponent(),
+                                                   expectedVersion: "1.2.0")
+        t.check(false, "naruszony bundel nie może przejść weryfikacji")
+    } catch UpdateInstallError.signatureInvalid {
+        t.check(true, "naruszona pieczęć podpisu → signatureInvalid")
+    } catch {
+        t.check(false, "oczekiwano signatureInvalid, jest: \(error)")
+    }
+
+    // Scenariusz 8: prawdziwa paczka z build-app.sh przechodzi weryfikację razem z podpisem.
+    // Wersję bierzemy z samej paczki, nie z build-app.sh: sprawdzamy, czy potok pakowania
+    // produkuje bundel, który silnik przyjmie, a nie czy ktoś właśnie podbił numer wydania.
+    let releaseZip = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent("build/VercelBar.zip")
+    if fm.fileExists(atPath: releaseZip.path) {
+        let unpacked = updRoot.appendingPathComponent("release-unpacked", isDirectory: true)
+        do {
+            try UpdateInstallEngine.unpack(zip: releaseZip, into: unpacked)
+            let built = unpacked.appendingPathComponent("VercelBar.app")
+            guard let builtVersion = bundleVersion(at: built) else {
+                throw UpdateInstallError.infoPlistUnreadable
+            }
+            _ = try UpdateInstallEngine.verifiedBundle(in: unpacked, expectedVersion: builtVersion)
+            t.check(true, "paczka z build-app.sh przechodzi weryfikację (binarka + podpis)")
+        } catch {
+            t.check(false, "paczka z build-app.sh odrzucona: \(error)")
+        }
+    } else {
+        t.skip("brak build/VercelBar.zip — uruchom ./Scripts/build-app.sh")
+    }
 } catch {
     t.check(false, "test podmiany rzucił: \(error)")
 }
@@ -1309,11 +1465,39 @@ do {
 
 let restartCmd = UpdateInstallEngine.restartShellCommand(pid: 4242,
                                                          destination: URL(fileURLWithPath: "/Applications/VercelBar.app"))
-t.equal(restartCmd, "while kill -0 4242 2>/dev/null; do sleep 0.2; done; open '/Applications/VercelBar.app'",
-        "polecenie czeka na wyjście procesu i otwiera nową wersję")
-t.check(UpdateInstallEngine.restartShellCommand(pid: 1, destination: URL(fileURLWithPath: "/Users/o'brien/VercelBar.app"))
-            .hasSuffix(#"open '/Users/o'\''brien/VercelBar.app'"#),
-        "apostrof w ścieżce nie rozwala cytowania")
+t.check(restartCmd.contains("kill -0 4242"), "polecenie czeka na wyjście procesu o podanym pid")
+t.check(restartCmd.contains("-lt 150"), "czekanie ma granicę — powłoka nie wisi w nieskończoność")
+t.check(restartCmd.contains("for i in 1 2 3"), "trzy podejścia do open")
+t.check(restartCmd.contains("open -R '/Applications/VercelBar.app'"),
+        "ostatnia deska ratunku pokazuje aplikację w Finderze")
+
+/// Cytowanie sprawdzone wykonaniem: funkcja powłoki przesłania `open` i zapisuje
+/// argument, który do niej faktycznie doszedł. Pid nieistniejącego procesu wychodzi
+/// z pętli od razu, więc nic się nie uruchamia.
+func capturedOpenArgument(_ path: String) -> String? {
+    let out = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("vercelbar-open-\(UUID().uuidString)")
+    let command = UpdateInstallEngine.restartShellCommand(pid: 999_999,
+                                                          destination: URL(fileURLWithPath: path))
+    let script = "open() { printf '%s' \"$1\" > '\(out.path)'; }; " + command
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: "/bin/sh")
+    p.arguments = ["-c", script]
+    p.standardOutput = FileHandle.nullDevice
+    p.standardError = FileHandle.nullDevice
+    guard (try? p.run()) != nil else { return nil }
+    p.waitUntilExit()
+    defer { try? FileManager.default.removeItem(at: out) }
+    return try? String(contentsOf: out, encoding: .utf8)
+}
+
+for path in ["/Applications/VercelBar.app",
+             "/Users/x/My Apps/VercelBar.app",
+             "/Users/o'brien/VercelBar.app",
+             "/Users/x/$(whoami)/VercelBar.app",
+             "/Users/x/`id`;rm -rf ~/VercelBar.app"] {
+    t.equal(capturedOpenArgument(path), path, "ścieżka dochodzi do open dosłownie: \(path)")
+}
 
 // MARK: - Ikona paska menu
 
