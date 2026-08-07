@@ -16,6 +16,10 @@ struct PopoverView: View {
         VStack(spacing: 0) {
             if model.phase != .onboarding { header; Divider() }
             content
+            if model.availableUpdate != nil {
+                Divider()
+                updateBar
+            }
             // Stopka także w onboardingu (odstępstwo od makiety): bez niej nie ma
             // jak wyjść z aplikacji ani otworzyć Ustawień poza jednym przyciskiem.
             Divider()
@@ -142,6 +146,56 @@ struct PopoverView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: pasek aktualizacji
+
+    /// Nad stopką, w błękicie „buduje się", ale przygaszonym — ma być zauważalny raz na kilka
+    /// tygodni, a nie konkurować z wierszami deployów.
+    private var updateBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: updateSymbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color(nsColor: updateAccent))
+            Text(updateText)
+                .font(.system(size: 11.5))
+                .foregroundStyle(model.updateState == .failed ? .secondary : .primary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 6)
+            // Po porażce przycisk zostaje: druga próba bywa udana (zamknięty Finder,
+            // odblokowany katalog), a bez niego jedynym wyjściem jest ręczne pobranie.
+            if model.updateState == .idle || model.updateState == .failed {
+                Button(action: { model.installUpdate() }) {
+                    Text(l10n.updateInstallButton)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(nsColor: Theme.actionFg))
+                        .padding(.horizontal, 11).frame(height: 22)
+                        .background(Color(nsColor: Theme.actionBg))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(EdgeInsets(top: 7, leading: 13, bottom: 7, trailing: 11))
+        .background(Color(nsColor: Theme.updateBarBg))
+    }
+
+    private var updateText: String {
+        switch model.updateState {
+        case .downloading: l10n.updateDownloading
+        case .installing: l10n.updateInstalling
+        case .failed: l10n.updateFailed
+        case .idle: l10n.updateAvailable(version: model.availableUpdate?.version ?? "")
+        }
+    }
+
+    private var updateSymbol: String {
+        model.updateState == .failed ? "exclamationmark.triangle" : "arrow.down.circle"
+    }
+
+    private var updateAccent: NSColor {
+        model.updateState == .failed ? Theme.error : Theme.building
     }
 
     // MARK: stopka

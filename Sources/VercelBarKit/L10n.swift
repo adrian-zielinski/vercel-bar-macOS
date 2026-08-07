@@ -154,6 +154,28 @@ public struct L10n: Sendable {
           "Approve in System Settings → Login Items")
     }
 
+    // MARK: aktualizacje
+
+    public func updateAvailable(version: String) -> String {
+        t("Dostępna wersja \(version)", "Version \(version) available")
+    }
+
+    public var updateInstallButton: String { t("Zaktualizuj", "Update") }
+    public var updateDownloading: String { t("Pobieranie…", "Downloading…") }
+    public var updateInstalling: String { t("Instalowanie…", "Installing…") }
+
+    public var updateFailed: String {
+        t("Aktualizacja się nie udała. Otworzyłem stronę wydania.",
+          "The update failed. The release page is open in your browser.")
+    }
+
+    public var checkForUpdates: String { t("Sprawdź aktualizacje", "Check for updates") }
+    public var upToDate: String { t("Masz najnowszą wersję", "You're up to date") }
+
+    public func versionLabel(version: String) -> String {
+        t("Wersja \(version)", "Version \(version)")
+    }
+
     // MARK: powiadomienia
 
     public func deployStartedTitle(project: String) -> String {

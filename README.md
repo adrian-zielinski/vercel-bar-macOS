@@ -14,6 +14,7 @@ A small triangle sits in your menu bar and shows the state of your deploys at a 
 - ✅ **Teams**: watch your personal account or any team you belong to
 - ✅ **Token lives in the Keychain**, never in a file
 - ✅ **English + Polish**: follows your system language, or pick one in Settings and the UI switches instantly
+- ✅ **Updates itself**: one click in the popover downloads the new release and relaunches on it
 - ✅ **Light and dark mode**, respects Reduce Motion
 - ✅ **Tiny native Swift app**: 1.4 MB on disk, zero dependencies, no Electron
 
@@ -62,6 +63,12 @@ The script downloads the latest release into Applications and launches it. Termi
 3. Open the **Projects** tab and check the projects you care about.
 
 VercelBar polls the Vercel API every 30 seconds, and every 10 seconds while a build runs. On API errors it backs off exponentially, up to 5 minutes. macOS will ask for notification permission on first launch and for keychain access after an app update; choose "Always Allow" and it stays quiet.
+
+## Updates
+
+Once a day VercelBar asks GitHub Releases whether a newer version exists — a single anonymous request, no account, no telemetry. When one is out, a bar shows up above the popover footer: click **Update** and the app downloads the release, checks that the bundle inside carries the right identifier and version, swaps itself in place (the old copy goes to the Trash) and relaunches on the new version. If any step fails, the release page opens in your browser and the running app stays exactly as it was. Settings → Account has a **Check for updates** button for the impatient.
+
+The app is signed ad-hoc, so macOS treats every new build as a new app: right after an update it asks once for keychain access to read your token. Choose "Always Allow" and it stays quiet.
 
 ## Uninstall
 

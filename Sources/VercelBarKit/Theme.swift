@@ -41,6 +41,10 @@ public enum Theme {
     public static let progressTrack = dynamicColor(light: hex(0x000000, alpha: 0.07), dark: hex(0xffffff, alpha: 0.10))
     public static let onboardingLogo = dynamicColor(light: hex(0x3c3c43, alpha: 0.28), dark: hex(0xebebf5, alpha: 0.28))
 
+    // Pasek aktualizacji nad stopką — ten sam błękit co „buduje się", ale ledwo widoczny,
+    // żeby informował, a nie krzyczał ponad wierszami deployów.
+    public static let updateBarBg = dynamicColor(light: hex(0x0064e0, alpha: 0.07), dark: hex(0x0a84ff, alpha: 0.12))
+
     // Przycisk akcji onboardingu — makieta: czarny na jasnym, biały na ciemnym.
     public static let actionBg = dynamicColor(light: hex(0x1c1c1e), dark: hex(0xf2f2f7))
     public static let actionFg = dynamicColor(light: hex(0xfbfbfd), dark: hex(0x16161a))

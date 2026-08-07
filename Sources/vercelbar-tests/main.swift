@@ -342,6 +342,26 @@ t.equal(plTexts.feedLimitLabel, "Historia deployów", "etykieta głębokości hi
 t.equal(enTexts.feedLimitLabel, "Deploy history", "etykieta głębokości historii po angielsku")
 t.equal(L10n(lang: .en).lang, .en, "L10n pamięta wybrany język")
 
+t.suite("L10n — teksty aktualizacji")
+t.equal(plTexts.updateAvailable(version: "1.2.0"), "Dostępna wersja 1.2.0", "baner aktualizacji po polsku")
+t.equal(enTexts.updateAvailable(version: "1.2.0"), "Version 1.2.0 available", "baner aktualizacji po angielsku")
+t.equal(plTexts.updateInstallButton, "Zaktualizuj", "przycisk aktualizacji po polsku")
+t.equal(enTexts.updateInstallButton, "Update", "przycisk aktualizacji po angielsku")
+t.equal(plTexts.updateDownloading, "Pobieranie…", "stan pobierania po polsku")
+t.equal(enTexts.updateDownloading, "Downloading…", "stan pobierania po angielsku")
+t.equal(plTexts.updateInstalling, "Instalowanie…", "stan instalacji po polsku")
+t.equal(enTexts.updateInstalling, "Installing…", "stan instalacji po angielsku")
+t.equal(plTexts.updateFailed, "Aktualizacja się nie udała. Otworzyłem stronę wydania.",
+        "komunikat porażki po polsku")
+t.equal(enTexts.updateFailed, "The update failed. The release page is open in your browser.",
+        "komunikat porażki po angielsku")
+t.equal(plTexts.checkForUpdates, "Sprawdź aktualizacje", "przycisk sprawdzania po polsku")
+t.equal(enTexts.checkForUpdates, "Check for updates", "przycisk sprawdzania po angielsku")
+t.equal(plTexts.upToDate, "Masz najnowszą wersję", "potwierdzenie aktualności po polsku")
+t.equal(enTexts.upToDate, "You're up to date", "potwierdzenie aktualności po angielsku")
+t.equal(plTexts.versionLabel(version: "1.1.0"), "Wersja 1.1.0", "etykieta wersji po polsku")
+t.equal(enTexts.versionLabel(version: "1.1.0"), "Version 1.1.0", "etykieta wersji po angielsku")
+
 // MARK: - Silnik powiadomień
 
 func summary(id: String, state: DeployState) -> DeploymentSummary {
@@ -1016,6 +1036,285 @@ settings.feedLimit = 4
 t.equal(SettingsStore(defaults: defaults).feedLimit, 5, "zapis złej wartości też ląduje na 5")
 defaults.removePersistentDomain(forName: suiteName)
 
+// MARK: - Aktualizacje: porównanie wersji
+
+t.suite("SemVer.isNewer")
+t.check(SemVer.isNewer("1.1.0", than: "1.0.1"), "1.1.0 jest nowsze od 1.0.1")
+t.check(SemVer.isNewer("v1.2.0", than: "1.1.0"), "prefiks v nie przeszkadza")
+t.check(!SemVer.isNewer("1.1.0", than: "1.1.0"), "ta sama wersja to nie aktualizacja")
+t.check(SemVer.isNewer("1.10.0", than: "1.9.0"), "1.10.0 > 1.9.0 — porównanie liczbowe, nie leksykalne")
+t.check(!SemVer.isNewer("1.9.0", than: "1.10.0"), "1.9.0 nie jest nowsze od 1.10.0")
+t.check(SemVer.isNewer("2.0", than: "1.9.9"), "różna liczba członów: 2.0 > 1.9.9")
+t.check(!SemVer.isNewer("1.2", than: "1.2.0"), "1.2 to ta sama wersja co 1.2.0")
+t.check(!SemVer.isNewer("wersja-testowa", than: "1.0.0"), "śmieciowy kandydat → false")
+t.check(!SemVer.isNewer("2.0.0", than: "śmieć"), "śmieciowa wersja bieżąca → false")
+t.check(!SemVer.isNewer("1.2.3-beta", than: "1.2.2"), "człon nieliczbowy wywraca porównanie")
+t.check(!SemVer.isNewer("", than: "1.0.0"), "pusty string → false")
+t.check(SemVer.equals("1.2", "1.2.0"), "equals dopełnia zerami")
+t.check(!SemVer.equals("1.2.1", "1.2.0"), "equals rozróżnia patche")
+t.check(!SemVer.equals("śmieć", "śmieć"), "dwa śmiecie to nie ta sama wersja")
+
+// MARK: - Aktualizacje: parsowanie wydania GitHuba
+
+let zipAssetURL = "https://github.com/adrian-zielinski/vercelbar/releases/download/v1.2.0/VercelBar.zip"
+
+func releaseJSON(tag: String,
+                 assetName: String? = "VercelBar.zip",
+                 prerelease: Bool = false,
+                 draft: Bool = false) -> Data {
+    let assets = assetName.map {
+        #"[{"name":"\#($0)","browser_download_url":"\#(zipAssetURL)"}]"#
+    } ?? "[]"
+    return Data("""
+    {"tag_name":"\(tag)",
+     "html_url":"https://github.com/adrian-zielinski/vercelbar/releases/tag/\(tag)",
+     "draft":\(draft),"prerelease":\(prerelease),
+     "assets":\(assets)}
+    """.utf8)
+}
+
+t.suite("UpdateChecker.parseLatestRelease")
+do {
+    let info = try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "v1.2.0"),
+                                                    currentVersion: "1.1.0")
+    t.equal(info?.version, "1.2.0", "nowszy tag daje UpdateInfo bez prefiksu v")
+    t.equal(info?.zipURL.absoluteString, zipAssetURL, "URL paczki z assetu")
+    t.equal(info?.releaseURL.absoluteString,
+            "https://github.com/adrian-zielinski/vercelbar/releases/tag/v1.2.0",
+            "URL wydania z html_url")
+
+    t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "v1.1.0"),
+                                                 currentVersion: "1.1.0"), nil,
+            "równy tag → brak aktualizacji")
+    t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "v1.0.0"),
+                                                 currentVersion: "1.1.0"), nil,
+            "starszy tag → brak aktualizacji")
+    t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "v1.2.0", assetName: "VercelBar.dmg"),
+                                                 currentVersion: "1.1.0"), nil,
+            "wydanie bez VercelBar.zip → brak aktualizacji")
+    t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "v1.2.0", assetName: nil),
+                                                 currentVersion: "1.1.0"), nil,
+            "wydanie bez assetów → brak aktualizacji")
+    t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "v1.2.0", prerelease: true),
+                                                 currentVersion: "1.1.0"), nil,
+            "prerelease pomijany")
+    t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "v1.2.0", draft: true),
+                                                 currentVersion: "1.1.0"), nil,
+            "szkic wydania pomijany")
+    t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "1.2.0"),
+                                                 currentVersion: "1.1.0")?.version, "1.2.0",
+            "tag bez prefiksu też przechodzi")
+
+    let overHTTP = Data("""
+    {"tag_name":"v1.2.0","html_url":"https://github.com/adrian-zielinski/vercelbar/releases/tag/v1.2.0",
+     "draft":false,"prerelease":false,
+     "assets":[{"name":"VercelBar.zip","browser_download_url":"http://example.com/VercelBar.zip"}]}
+    """.utf8)
+    t.equal(try UpdateChecker.parseLatestRelease(from: overHTTP, currentVersion: "1.1.0"), nil,
+            "paczka spoza HTTPS odrzucona")
+} catch {
+    t.check(false, "parsowanie wydania rzuciło: \(error)")
+}
+
+// Kształt wprost z /releases/latest: mnóstwo pól obok, `label` bywa nullem,
+// a paczka .dmg stoi na liście przed .zip.
+let realShapedRelease = Data("""
+{"url":"https://api.github.com/repos/adrian-zielinski/vercelbar/releases/1",
+ "id":1,"node_id":"RE_kw","tag_name":"v1.3.0","target_commitish":"main","name":"1.3.0",
+ "draft":false,"prerelease":false,"created_at":"2026-08-07T09:00:00Z",
+ "published_at":"2026-08-07T09:10:00Z","body":"## Co nowego\\n- silnik aktualizacji",
+ "html_url":"https://github.com/adrian-zielinski/vercelbar/releases/tag/v1.3.0",
+ "author":{"login":"adrian-zielinski","id":2},
+ "assets":[
+   {"id":10,"name":"VercelBar.dmg","label":null,"size":1234567,"download_count":3,
+    "content_type":"application/x-apple-diskimage","state":"uploaded",
+    "browser_download_url":"https://github.com/adrian-zielinski/vercelbar/releases/download/v1.3.0/VercelBar.dmg"},
+   {"id":11,"name":"VercelBar.zip","label":null,"size":460800,"download_count":7,
+    "content_type":"application/zip","state":"uploaded",
+    "browser_download_url":"https://github.com/adrian-zielinski/vercelbar/releases/download/v1.3.0/VercelBar.zip"}]}
+""".utf8)
+do {
+    let info = try UpdateChecker.parseLatestRelease(from: realShapedRelease, currentVersion: "1.1.0")
+    t.equal(info?.version, "1.3.0", "realistyczna odpowiedź GitHuba parsuje się")
+    t.equal(info?.zipURL.lastPathComponent, "VercelBar.zip", "spośród assetów wybrany jest zip, nie dmg")
+} catch {
+    t.check(false, "realistyczna odpowiedź rzuciła: \(error)")
+}
+
+t.suite("UpdateChecker.checkForUpdate — sieć")
+t.equal(UpdateEndpoint.latestReleaseURL.absoluteString,
+        "https://api.github.com/repos/adrian-zielinski/vercelbar/releases/latest",
+        "adres najnowszego wydania")
+
+let updStub = StubSession(runner: t)
+updStub.responses["releases/latest"] = (200, releaseJSON(tag: "v1.2.0"))
+let found = await UpdateChecker.checkForUpdate(session: updStub, currentVersion: "1.1.0")
+t.equal(found?.version, "1.2.0", "200 z nowszym tagiem → UpdateInfo")
+t.equal(updStub.lastRequest?.value(forHTTPHeaderField: "Accept"), "application/vnd.github+json",
+        "nagłówek Accept dla API GitHuba")
+t.check(updStub.lastRequest?.value(forHTTPHeaderField: "Authorization") == nil,
+        "sprawdzanie aktualizacji idzie anonimowo")
+
+let rateLimited = StubSession(runner: t)
+rateLimited.responses["releases/latest"] = (403, Data(#"{"message":"API rate limit exceeded"}"#.utf8))
+t.equal(await UpdateChecker.checkForUpdate(session: rateLimited, currentVersion: "1.1.0"), nil,
+        "403 (limit zapytań) połykany do nil")
+
+let updOffline = StubSession(runner: t)
+updOffline.thrownError = URLError(.notConnectedToInternet)
+t.equal(await UpdateChecker.checkForUpdate(session: updOffline, currentVersion: "1.1.0"), nil,
+        "brak sieci połykany do nil")
+
+let garbage = StubSession(runner: t)
+garbage.responses["releases/latest"] = (200, Data("nie-json".utf8))
+t.equal(await UpdateChecker.checkForUpdate(session: garbage, currentVersion: "1.1.0"), nil,
+        "nieparsowalna odpowiedź połykana do nil")
+
+// MARK: - Aktualizacje: podmiana bundla na atrapie
+
+/// Atrapa aplikacji: katalog `.app` z samym Info.plist i pustą binarką.
+/// Testy nigdy nie dotykają prawdziwego VercelBar.app ani kosza użytkownika.
+func makeFakeApp(at url: URL, version: String, bundleID: String) throws {
+    let fm = FileManager.default
+    try fm.createDirectory(at: url.appendingPathComponent("Contents/MacOS"),
+                           withIntermediateDirectories: true)
+    let plist: [String: Any] = ["CFBundleIdentifier": bundleID,
+                                "CFBundleShortVersionString": version,
+                                "CFBundleName": "VercelBar",
+                                "CFBundleExecutable": "VercelBar"]
+    try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        .write(to: url.appendingPathComponent("Contents/Info.plist"))
+    try Data("atrapa".utf8).write(to: url.appendingPathComponent("Contents/MacOS/VercelBar"))
+}
+
+func zipApp(_ app: URL, to zip: URL) -> Bool {
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+    p.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", app.path, zip.path]
+    p.standardOutput = FileHandle.nullDevice
+    p.standardError = FileHandle.nullDevice
+    guard (try? p.run()) != nil else { return false }
+    p.waitUntilExit()
+    return p.terminationStatus == 0
+}
+
+func bundleVersion(at app: URL) -> String? {
+    guard let data = try? Data(contentsOf: app.appendingPathComponent("Contents/Info.plist")),
+          let info = try? PropertyListSerialization.propertyList(from: data, format: nil)
+            as? [String: Any] else { return nil }
+    return info["CFBundleShortVersionString"] as? String
+}
+
+t.suite("UpdateInstallEngine — podmiana na atrapie")
+let updRoot = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+    .appendingPathComponent("vercelbar-testy-\(UUID().uuidString)", isDirectory: true)
+do {
+    let fm = FileManager.default
+
+    // Scenariusz 1: zgodna paczka wchodzi na miejsce starej wersji.
+    let dest = updRoot.appendingPathComponent("Applications/VercelBar.app")
+    try makeFakeApp(at: dest, version: "1.1.0", bundleID: "pl.zielinski.vercelbar")
+    let staging = updRoot.appendingPathComponent("staging/VercelBar.app")
+    try makeFakeApp(at: staging, version: "1.2.0", bundleID: "pl.zielinski.vercelbar")
+    let zip = updRoot.appendingPathComponent("VercelBar.zip")
+    t.check(zipApp(staging, to: zip), "ditto spakował atrapę nowej wersji")
+
+    let work = updRoot.appendingPathComponent("work")
+    // `moveOldToTrash: false` — atrapa nie ma po co lądować w koszu użytkownika;
+    // to ta sama ścieżka kodu, którą aplikacja wybiera, gdy kosz odmówi.
+    let outcome = try UpdateInstallEngine.install(zip: zip, destination: dest,
+                                                  expectedVersion: "1.2.0",
+                                                  workDirectory: work, moveOldToTrash: false)
+    t.equal(bundleVersion(at: dest), "1.2.0", "w miejscu docelowym stoi nowa wersja")
+    t.equal(outcome.installed, dest, "outcome wskazuje miejsce docelowe")
+    if let retired = outcome.retiredOld {
+        t.check(fm.fileExists(atPath: retired.path), "stary bundel istnieje po odstawieniu")
+        t.equal(bundleVersion(at: retired), "1.1.0", "odstawiony bundel to stara wersja")
+        t.check(retired.path.hasPrefix(work.path), "bez kosza stara wersja ląduje w katalogu roboczym")
+    } else {
+        t.check(false, "brak informacji, gdzie trafiła stara wersja")
+    }
+    t.check(!fm.fileExists(atPath: work.appendingPathComponent("unpacked/VercelBar.app").path),
+            "rozpakowany bundel został przeniesiony, nie skopiowany")
+
+    // Scenariusz 2: obcy bundle id — fallback bez podmiany.
+    let dest2 = updRoot.appendingPathComponent("Applications2/VercelBar.app")
+    try makeFakeApp(at: dest2, version: "1.1.0", bundleID: "pl.zielinski.vercelbar")
+    let fake = updRoot.appendingPathComponent("podrobka/VercelBar.app")
+    try makeFakeApp(at: fake, version: "1.2.0", bundleID: "pl.zielinski.podrobka")
+    let fakeZip = updRoot.appendingPathComponent("Podrobka.zip")
+    t.check(zipApp(fake, to: fakeZip), "ditto spakował atrapę z obcym identyfikatorem")
+    do {
+        _ = try UpdateInstallEngine.install(zip: fakeZip, destination: dest2,
+                                            expectedVersion: "1.2.0",
+                                            workDirectory: updRoot.appendingPathComponent("work2"),
+                                            moveOldToTrash: false)
+        t.check(false, "obcy bundle id powinien wywrócić instalację")
+    } catch UpdateInstallError.identifierMismatch(let id) {
+        t.equal(id, "pl.zielinski.podrobka", "błąd niesie napotkany identyfikator")
+    } catch {
+        t.check(false, "oczekiwano identifierMismatch, jest: \(error)")
+    }
+    t.equal(bundleVersion(at: dest2), "1.1.0", "przy obcym bundle id stara wersja zostaje na miejscu")
+
+    // Scenariusz 3: wersja w paczce inna niż zapowiadana przez wydanie.
+    do {
+        _ = try UpdateInstallEngine.install(zip: zip, destination: dest2,
+                                            expectedVersion: "1.3.0",
+                                            workDirectory: updRoot.appendingPathComponent("work3"),
+                                            moveOldToTrash: false)
+        t.check(false, "niezgodna wersja powinna wywrócić instalację")
+    } catch UpdateInstallError.versionMismatch(let v) {
+        t.equal(v, "1.2.0", "błąd niesie wersję znalezioną w paczce")
+    } catch {
+        t.check(false, "oczekiwano versionMismatch, jest: \(error)")
+    }
+    t.equal(bundleVersion(at: dest2), "1.1.0", "przy niezgodnej wersji stara wersja zostaje na miejscu")
+
+    // Scenariusz 4: paczka bez bundla w środku.
+    let junk = updRoot.appendingPathComponent("junk/notes.txt")
+    try fm.createDirectory(at: junk.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data("nic tu nie ma".utf8).write(to: junk)
+    let junkZip = updRoot.appendingPathComponent("Junk.zip")
+    t.check(zipApp(junk, to: junkZip), "ditto spakował paczkę bez bundla")
+    do {
+        _ = try UpdateInstallEngine.install(zip: junkZip, destination: dest2,
+                                            expectedVersion: "1.2.0",
+                                            workDirectory: updRoot.appendingPathComponent("work4"),
+                                            moveOldToTrash: false)
+        t.check(false, "paczka bez VercelBar.app powinna wywrócić instalację")
+    } catch UpdateInstallError.bundleMissing {
+        t.check(true, "paczka bez VercelBar.app → bundleMissing")
+    } catch {
+        t.check(false, "oczekiwano bundleMissing, jest: \(error)")
+    }
+    t.equal(bundleVersion(at: dest2), "1.1.0", "po odrzuconej paczce stara wersja nadal stoi")
+} catch {
+    t.check(false, "test podmiany rzucił: \(error)")
+}
+try? FileManager.default.removeItem(at: updRoot)
+
+t.suite("UpdateInstallEngine — katalog roboczy i restart")
+do {
+    let work = try UpdateInstallEngine.makeWorkDirectory()
+    t.check(FileManager.default.fileExists(atPath: work.path), "katalog roboczy powstaje")
+    t.check(work.lastPathComponent.hasPrefix("vercelbar-update-"), "katalog roboczy w tmp, z rozpoznawalną nazwą")
+    let second = try UpdateInstallEngine.makeWorkDirectory()
+    t.check(second != work, "każde wywołanie daje osobny katalog")
+    try? FileManager.default.removeItem(at: work)
+    try? FileManager.default.removeItem(at: second)
+} catch {
+    t.check(false, "tworzenie katalogu roboczego rzuciło: \(error)")
+}
+
+let restartCmd = UpdateInstallEngine.restartShellCommand(pid: 4242,
+                                                         destination: URL(fileURLWithPath: "/Applications/VercelBar.app"))
+t.equal(restartCmd, "while kill -0 4242 2>/dev/null; do sleep 0.2; done; open '/Applications/VercelBar.app'",
+        "polecenie czeka na wyjście procesu i otwiera nową wersję")
+t.check(UpdateInstallEngine.restartShellCommand(pid: 1, destination: URL(fileURLWithPath: "/Users/o'brien/VercelBar.app"))
+            .hasSuffix(#"open '/Users/o'\''brien/VercelBar.app'"#),
+        "apostrof w ścieżce nie rozwala cytowania")
+
 // MARK: - Ikona paska menu
 
 t.suite("StatusIconRenderer")
@@ -1053,6 +1352,8 @@ t.check(matchesHex(resolved(Theme.badgeReadyBg, .darkAqua), 0x30d158, alpha: 0.1
 t.check(matchesHex(resolved(Theme.rowErrorBg, .aqua), 0xd70015, alpha: 0.055), "tło wiersza błędu w jasnym to czerwień 5,5 %")
 t.check(matchesHex(resolved(Theme.rowErrorBg, .darkAqua), 0xff453a, alpha: 0.085), "tło wiersza błędu w ciemnym to czerwień 8,5 %")
 t.check(matchesHex(resolved(Theme.successFlash, .darkAqua), 0x30d158, alpha: 0.20), "rozbłysk sukcesu w ciemnym to zieleń 20 %")
+t.check(matchesHex(resolved(Theme.updateBarBg, .aqua), 0x0064e0, alpha: 0.07), "pasek aktualizacji w jasnym to błękit 7 %")
+t.check(matchesHex(resolved(Theme.updateBarBg, .darkAqua), 0x0a84ff, alpha: 0.12), "pasek aktualizacji w ciemnym to błękit 12 %")
 
 // MARK: - Orientacja trójkąta
 

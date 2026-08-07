@@ -36,6 +36,9 @@ final class AppModel: ObservableObject {
     /// Język faktycznie pokazywany; wstrzykiwany widokom przez `\.l10n`, więc przełącznik
     /// w Ustawieniach przerysowuje UI od razu, bez restartu.
     @Published var lang: Lang = .system()
+    /// Nowsze wydanie z GitHuba — pasek w popoverze. Nil, gdy nic nie czeka.
+    @Published var availableUpdate: UpdateInfo?
+    @Published var updateState: UpdateInstaller.State = .idle
 
     let keychain = KeychainStore()
     let settings = SettingsStore()
@@ -48,6 +51,7 @@ final class AppModel: ObservableObject {
     private var engine = NotificationEngine()
     private var pollTask: Task<Void, Never>?
     private var pulseTimer: Timer?
+    private var updateTimer: Timer?
     private var tokenAlertShown = false
     private var started = false
     private var consecutiveFailures = 0 // backoff dla 429/5xx
@@ -71,6 +75,7 @@ final class AppModel: ObservableObject {
         guard !started else { return }
         started = true
         NotificationPresenter.shared.setUp()
+        startUpdateChecks()
         // Odśwież po obudzeniu Maca ze snu.
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
@@ -292,6 +297,48 @@ final class AppModel: ObservableObject {
         Task {
             await loadAllProjects()
             await refresh()
+        }
+    }
+
+    // MARK: aktualizacje
+
+    /// Wersja z Info.plist. Nil poza bundlem (`swift run`) — i to jedyny wyłącznik
+    /// całego silnika aktualizacji: bez wersji nie ma z czym porównywać ani czego podmieniać.
+    var currentVersion: String? {
+        guard Bundle.main.bundleIdentifier == UpdateInstallEngine.expectedBundleID else { return nil }
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+    }
+
+    private func startUpdateChecks() {
+        guard currentVersion != nil else { return }
+        Task { await checkForUpdate() }
+        // Raz na dobę — jedno anonimowe zapytanie do GitHuba nie ma prawa nikomu ciążyć.
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.checkForUpdate() }
+        }
+    }
+
+    /// Zwraca, czy czeka nowsza wersja — Ustawienia pokazują na tej podstawie „Masz najnowszą wersję".
+    @discardableResult
+    func checkForUpdate() async -> Bool {
+        guard let currentVersion else { return false }
+        // W trakcie pobierania/instalacji nie ruszaj baneru — timer dobowy nie ma prawa
+        // zabrać spod palców wydania, które właśnie się instaluje.
+        guard updateState == .idle || updateState == .failed else { return availableUpdate != nil }
+        // Nil znaczy „nic nowego albo nie udało się sprawdzić" — w obu przypadkach
+        // stary baner ma zniknąć, bo wydanie mogło zostać wycofane.
+        let found = await UpdateChecker.checkForUpdate(currentVersion: currentVersion)
+        availableUpdate = found
+        return found != nil
+    }
+
+    func installUpdate() {
+        guard let update = availableUpdate else { return }
+        guard updateState == .idle || updateState == .failed else { return } // bez podwójnego kliknięcia
+        Task {
+            await UpdateInstaller.install(update) { [weak self] state in
+                self?.updateState = state
+            }
         }
     }
 
