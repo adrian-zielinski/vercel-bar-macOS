@@ -1,6 +1,6 @@
 cask "vercelbar" do
-  version "1.0.1"
-  sha256 "7bf3c3c5b10a350101417504cc1457a16fd1079f0c8fd78a6694b0fce3763cec"
+  version "1.1.0"
+  sha256 "c7831adba7469e19349cb94f8ad7db85ce26d8309e8c35ed6f5f107f11e266b3"
 
   url "https://github.com/adrian-zielinski/vercelbar/releases/download/v#{version}/VercelBar.zip"
   name "VercelBar"
