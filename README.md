@@ -17,7 +17,8 @@ zgłaszają padnięte i ukończone deploye.
 
 ## Konfiguracja
 
-1. Wygeneruj token: vercel.com → Account Settings → Tokens (wystarczy odczyt).
+1. Wygeneruj token: vercel.com → Account Settings → Tokens. Jako zakres (scope) wybierz
+   konto lub zespół, który chcesz obserwować.
 2. Klik w trójkąt → Połącz z Vercelem → wklej token.
 3. Zakładka Projekty → zaznacz, co obserwować.
 

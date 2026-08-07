@@ -15,7 +15,10 @@ struct PopoverView: View {
         VStack(spacing: 0) {
             if model.phase != .onboarding { header; Divider() }
             content
-            if model.phase != .onboarding { Divider(); footer }
+            // Stopka także w onboardingu (odstępstwo od makiety): bez niej nie ma
+            // jak wyjść z aplikacji ani otworzyć Ustawień poza jednym przyciskiem.
+            Divider()
+            footer
         }
         .frame(width: 340)
     }
@@ -143,8 +146,10 @@ struct PopoverView: View {
 
     private var footer: some View {
         HStack(spacing: 2) {
-            footerButton("Odśwież", system: "arrow.clockwise") {
-                Task { await model.refresh() }
+            if model.phase != .onboarding { // bez tokenu nie ma czego odświeżać
+                footerButton("Odśwież", system: "arrow.clockwise") {
+                    Task { await model.refresh() }
+                }
             }
             footerButton("Ustawienia", system: "gearshape") { openSettings() }
             Spacer()

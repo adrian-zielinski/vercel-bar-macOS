@@ -15,7 +15,7 @@ struct SettingsView: View {
     @State private var tokenField = ""
     @State private var connectProblem: AppModel.ConnectResult?
     @State private var search = ""
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLogin = SettingsView.loginItemRegistered()
     @State private var notifySuccess = true
     @State private var notifyFailure = true
     @State private var loginItemNeedsApproval = SMAppService.mainApp.status == .requiresApproval
@@ -121,8 +121,9 @@ struct SettingsView: View {
     private var tokenHint: String {
         switch connectProblem {
         case .rejected: "Vercel odrzucił ten token. Sprawdź, czy skopiowany w całości."
+        case .network: "Brak połączenia z Vercelem. Sprawdź internet i spróbuj ponownie."
         case .keychainFailure: "Token poprawny, ale zapis w pęku kluczy się nie powiódł. Otwórz Keychain Access i sprawdź dostęp."
-        default: "Token z panelu Vercela → Account Settings → Tokens. Zakres: tylko odczyt."
+        default: "Token z panelu Vercela → Account Settings → Tokens. Zakres (scope): konto lub zespół, który chcesz obserwować."
         }
     }
 
@@ -180,9 +181,7 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .overlay {
                 if model.allProjects.isEmpty {
-                    Text(model.phase == .offline
-                         ? "Brak połączenia z Vercelem."
-                         : "Wczytywanie projektów…")
+                    Text(emptyListMessage)
                         .font(.system(size: 11.5))
                         .foregroundStyle(.tertiary)
                 }
@@ -190,10 +189,20 @@ struct SettingsView: View {
         }
     }
 
+    /// Pusta lista znaczy co innego przed połączeniem, co innego bez sieci, a co innego w trakcie wczytywania.
+    private var emptyListMessage: String {
+        if !model.hasToken { return "Połącz konto w zakładce Konto." }
+        if model.phase == .offline { return "Brak połączenia z Vercelem." }
+        return "Wczytywanie projektów…"
+    }
+
     /// Zanim lista dojedzie, „3 z 0 projektów monitorowanych" zestawia trwałe ID z pustką.
     private var countLabel: String {
         guard !model.allProjects.isEmpty else { return "" }
-        return "\(model.settings.watchedProjectIDs.count) z \(model.allProjects.count) projektów monitorowanych"
+        // Zaznaczenia z innego zespołu zostają w ustawieniach — licz przecięcie z widoczną
+        // listą, inaczej N zawyża i potrafi przebić M.
+        let watched = model.allProjects.filter { model.settings.watchedProjectIDs.contains($0.id) }.count
+        return "\(watched) z \(model.allProjects.count) projektów monitorowanych"
     }
 
     private var filteredProjects: [Project] {
@@ -236,6 +245,13 @@ struct SettingsView: View {
         .frame(height: 27)
     }
 
+    /// Element czekający na zatwierdzenie JEST zarejestrowany — suwak ma to pokazywać,
+    /// inaczej stoi na OFF obok podpowiedzi „zatwierdź w Ustawieniach systemowych".
+    private static func loginItemRegistered() -> Bool {
+        let status = SMAppService.mainApp.status
+        return status == .enabled || status == .requiresApproval
+    }
+
     private func setLaunchAtLogin(_ enabled: Bool) {
         // SMAppService działa tylko w bundlu .app; przy `swift run` cicho ignorujemy.
         guard Bundle.main.bundleIdentifier != nil else { return }
@@ -250,7 +266,7 @@ struct SettingsView: View {
                 loginItemNeedsApproval = false
             }
         } catch {
-            launchAtLogin = SMAppService.mainApp.status == .enabled
+            launchAtLogin = Self.loginItemRegistered()
             loginItemNeedsApproval = false
         }
     }

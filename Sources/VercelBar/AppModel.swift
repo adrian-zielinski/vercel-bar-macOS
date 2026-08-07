@@ -17,6 +17,7 @@ final class AppModel: ObservableObject {
     enum ConnectResult: Equatable {
         case ok
         case rejected        // Vercel odrzucił token (albo pusty)
+        case network         // nie dojechaliśmy do Vercela — token nie jest niczemu winien
         case keychainFailure // token poprawny, ale zapis do pęku się nie powiódł
     }
 
@@ -120,7 +121,12 @@ final class AppModel: ObservableObject {
             if keychainReadFailures >= 3 { phase = .tokenInvalid }
             return
         }
-        guard let token = storedToken else { phase = .onboarding; hasToken = false; return }
+        guard let token = storedToken else {
+            phase = .onboarding
+            hasToken = false
+            updatePulse(active: false) // bez tego ikona pulsuje dalej po usunięciu tokenu
+            return
+        }
         let api = VercelAPI(token: token, teamID: settings.teamID)
         do {
             let snapshot = try await RefreshCore.fetch(api: api,
@@ -165,9 +171,12 @@ final class AppModel: ObservableObject {
         guard !trimmed.isEmpty else { return .rejected }
         do {
             let api = VercelAPI(token: trimmed)
-            account = try await api.user()
-            teams = (try? await api.teams()) ?? []
+            let user = try await api.user()
+            // Stan „Połączono" dopiero po udanym zapisie — inaczej przy porażce pęku
+            // UI melduje połączenie, którego następny odczyt tokenu nie potwierdzi.
             try keychain.writeToken(trimmed)
+            account = user
+            teams = (try? await api.teams()) ?? []
             hasToken = true
             tokenAlertShown = false
             keychainReadFailures = 0
@@ -176,6 +185,12 @@ final class AppModel: ObservableObject {
             await loadAllProjects()
             restartPolling()
             return .ok
+        } catch let e as VercelAPIError {
+            // Brak sieci, 429 i 5xx nie mówią nic o tokenie — nie zwalaj na niego winy.
+            switch e {
+            case .offline, .rateLimited, .server: return .network
+            default: return .rejected
+            }
         } catch is KeychainStore.KeychainError {
             return .keychainFailure
         } catch {

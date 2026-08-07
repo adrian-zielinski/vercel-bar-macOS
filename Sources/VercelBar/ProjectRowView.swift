@@ -15,6 +15,8 @@ struct ProjectRowView: View {
     var body: some View {
         Button(action: open) { rowContent }
             .buttonStyle(.plain)
+            // Wiersz bez adresów nie ma czego otworzyć — niech nie udaje klikalnego.
+            .disabled(deploy?.inspectorURL == nil && deploy?.previewURL == nil)
             .background {
                 ZStack {
                     rowBackground
