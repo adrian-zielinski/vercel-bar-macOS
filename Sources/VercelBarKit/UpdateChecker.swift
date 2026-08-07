@@ -59,7 +59,7 @@ public enum SemVer {
 /// Adres sprawdzania aktualizacji. Osobno, bo runner testów weryfikuje sam URL.
 public struct UpdateEndpoint {
     public static let latestReleaseURL =
-        URL(string: "https://api.github.com/repos/adrian-zielinski/vercelbar/releases/latest")!
+        URL(string: "https://api.github.com/repos/adrian-zielinski/vercel-bar-macOS/releases/latest")!
     /// Nazwa assetu z bundlem — ta sama, którą wypluwa `Scripts/build-app.sh`.
     public static let assetName = "VercelBar.zip"
 }

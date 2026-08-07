@@ -1064,7 +1064,7 @@ t.check(!SemVer.equals("śmieć", "śmieć"), "dwa śmiecie to nie ta sama wersj
 
 // MARK: - Aktualizacje: parsowanie wydania GitHuba
 
-let zipAssetURL = "https://github.com/adrian-zielinski/vercelbar/releases/download/v1.2.0/VercelBar.zip"
+let zipAssetURL = "https://github.com/adrian-zielinski/vercel-bar-macOS/releases/download/v1.2.0/VercelBar.zip"
 
 func releaseJSON(tag: String,
                  assetName: String? = "VercelBar.zip",
@@ -1075,7 +1075,7 @@ func releaseJSON(tag: String,
     } ?? "[]"
     return Data("""
     {"tag_name":"\(tag)",
-     "html_url":"https://github.com/adrian-zielinski/vercelbar/releases/tag/\(tag)",
+     "html_url":"https://github.com/adrian-zielinski/vercel-bar-macOS/releases/tag/\(tag)",
      "draft":\(draft),"prerelease":\(prerelease),
      "assets":\(assets)}
     """.utf8)
@@ -1088,7 +1088,7 @@ do {
     t.equal(info?.version, "1.2.0", "nowszy tag daje UpdateInfo bez prefiksu v")
     t.equal(info?.zipURL.absoluteString, zipAssetURL, "URL paczki z assetu")
     t.equal(info?.releaseURL.absoluteString,
-            "https://github.com/adrian-zielinski/vercelbar/releases/tag/v1.2.0",
+            "https://github.com/adrian-zielinski/vercel-bar-macOS/releases/tag/v1.2.0",
             "URL wydania z html_url")
 
     t.equal(try UpdateChecker.parseLatestRelease(from: releaseJSON(tag: "v1.1.0"),
@@ -1125,7 +1125,7 @@ do {
             "tag nieliczbowy → brak aktualizacji")
 
     let overHTTP = Data("""
-    {"tag_name":"v1.2.0","html_url":"https://github.com/adrian-zielinski/vercelbar/releases/tag/v1.2.0",
+    {"tag_name":"v1.2.0","html_url":"https://github.com/adrian-zielinski/vercel-bar-macOS/releases/tag/v1.2.0",
      "draft":false,"prerelease":false,
      "assets":[{"name":"VercelBar.zip","browser_download_url":"http://example.com/VercelBar.zip"}]}
     """.utf8)
@@ -1138,19 +1138,19 @@ do {
 // Kształt wprost z /releases/latest: mnóstwo pól obok, `label` bywa nullem,
 // a paczka .dmg stoi na liście przed .zip.
 let realShapedRelease = Data("""
-{"url":"https://api.github.com/repos/adrian-zielinski/vercelbar/releases/1",
+{"url":"https://api.github.com/repos/adrian-zielinski/vercel-bar-macOS/releases/1",
  "id":1,"node_id":"RE_kw","tag_name":"v1.3.0","target_commitish":"main","name":"1.3.0",
  "draft":false,"prerelease":false,"created_at":"2026-08-07T09:00:00Z",
  "published_at":"2026-08-07T09:10:00Z","body":"## Co nowego\\n- silnik aktualizacji",
- "html_url":"https://github.com/adrian-zielinski/vercelbar/releases/tag/v1.3.0",
+ "html_url":"https://github.com/adrian-zielinski/vercel-bar-macOS/releases/tag/v1.3.0",
  "author":{"login":"adrian-zielinski","id":2},
  "assets":[
    {"id":10,"name":"VercelBar.dmg","label":null,"size":1234567,"download_count":3,
     "content_type":"application/x-apple-diskimage","state":"uploaded",
-    "browser_download_url":"https://github.com/adrian-zielinski/vercelbar/releases/download/v1.3.0/VercelBar.dmg"},
+    "browser_download_url":"https://github.com/adrian-zielinski/vercel-bar-macOS/releases/download/v1.3.0/VercelBar.dmg"},
    {"id":11,"name":"VercelBar.zip","label":null,"size":460800,"download_count":7,
     "content_type":"application/zip","state":"uploaded",
-    "browser_download_url":"https://github.com/adrian-zielinski/vercelbar/releases/download/v1.3.0/VercelBar.zip"}]}
+    "browser_download_url":"https://github.com/adrian-zielinski/vercel-bar-macOS/releases/download/v1.3.0/VercelBar.zip"}]}
 """.utf8)
 do {
     let info = try UpdateChecker.parseLatestRelease(from: realShapedRelease, currentVersion: "1.1.0")
@@ -1162,7 +1162,7 @@ do {
 
 t.suite("UpdateChecker.checkForUpdate — sieć")
 t.equal(UpdateEndpoint.latestReleaseURL.absoluteString,
-        "https://api.github.com/repos/adrian-zielinski/vercelbar/releases/latest",
+        "https://api.github.com/repos/adrian-zielinski/vercel-bar-macOS/releases/latest",
         "adres najnowszego wydania")
 
 let updStub = StubSession(runner: t)

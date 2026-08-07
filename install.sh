@@ -4,7 +4,7 @@
 # the right-click → Open dance.
 set -euo pipefail
 
-REPO="adrian-zielinski/vercelbar"
+REPO="adrian-zielinski/vercel-bar-macOS"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT INT TERM
 

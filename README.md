@@ -38,14 +38,14 @@ Notifications:
 **Homebrew**
 
 ```bash
-brew tap adrian-zielinski/vercelbar https://github.com/adrian-zielinski/vercelbar
+brew tap adrian-zielinski/vercel-bar-macOS https://github.com/adrian-zielinski/vercel-bar-macOS
 brew install --cask --no-quarantine vercelbar
 ```
 
 **One command, no Homebrew**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/adrian-zielinski/vercelbar/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/adrian-zielinski/vercel-bar-macOS/main/install.sh | bash
 ```
 
 The script downloads the latest release into Applications and launches it. Terminal downloads skip Gatekeeper's quarantine, so the app opens without the right-click dance.
@@ -86,7 +86,7 @@ security delete-generic-password -s pl.zielinski.vercelbar
 Requires Swift 6+ (Command Line Tools from Xcode 16 or newer). No third-party dependencies.
 
 ```bash
-git clone https://github.com/adrian-zielinski/vercelbar.git
+git clone https://github.com/adrian-zielinski/vercel-bar-macOS.git
 cd vercelbar
 
 # Build build/VercelBar.app and build/VercelBar.zip
