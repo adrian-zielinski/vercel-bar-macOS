@@ -395,6 +395,19 @@ final class StubSession: HTTPSession, @unchecked Sendable {
     private var storedResponses: [String: (Int, Data)] = [:] // fragment URL → (status, body)
     private var storedRequests: [URLRequest] = []
     private var storedError: Error?
+    private var storedDelayNanos: UInt64 = 0
+    private var inFlight = 0
+    private var peakInFlight = 0
+
+    /// Szczyt równoczesnych wywołań — dowód, że RefreshCore trzyma okno równoległości.
+    var maxInFlight: Int { lock.withLock { peakInFlight } }
+
+    /// Sztuczne opóźnienie odpowiedzi. Bez niego wywołania kończą się szybciej,
+    /// niż zdążą się nałożyć, i pomiar równoległości pokazywałby 1.
+    var delayNanos: UInt64 {
+        get { lock.withLock { storedDelayNanos } }
+        set { lock.withLock { storedDelayNanos = newValue } }
+    }
 
     var responses: [String: (Int, Data)] {
         get { lock.withLock { storedResponses } }
@@ -411,10 +424,18 @@ final class StubSession: HTTPSession, @unchecked Sendable {
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         let url = request.url!.absoluteString
-        let (error, matches) = lock.withLock { () -> (Error?, [(Int, Data)]) in
+        let (error, matches, delay) = lock.withLock { () -> (Error?, [(Int, Data)], UInt64) in
             storedRequests.append(request)
-            return (storedError, storedResponses.filter { url.contains($0.key) }.map(\.value))
+            inFlight += 1
+            peakInFlight = max(peakInFlight, inFlight)
+            return (storedError,
+                    storedResponses.filter { url.contains($0.key) }.map(\.value),
+                    storedDelayNanos)
         }
+        defer { lock.withLock { inFlight -= 1 } } // także przy rzuceniu błędu
+        // Sen POZA lockiem — pod lockiem wywołania ustawiłyby się w kolejkę i szczyt
+        // równoległości zawsze wynosiłby 1, niezależnie od tego, co robi RefreshCore.
+        if delay > 0 { try? await Task.sleep(nanoseconds: delay) }
         if let error { throw error }
         // Niejednoznaczne dopasowanie zgłaszamy jako porażkę testu zamiast ubijać runner.
         // Zgłoszenie pod tym samym lockiem — Runner nie jest bezpieczny wątkowo, a równoległy
@@ -591,6 +612,28 @@ do {
 } catch let e as VercelAPIError {
     t.equal(e, .server(500), "500 jednego projektu przerywa cały fetch")
 } catch { t.check(false, "zły typ błędu: \(error)") }
+
+t.suite("RefreshCore — okno równoległości")
+// Bez limitu salwa requestów przy kilkudziesięciu projektach łapie 429, a jeden 429
+// wywraca całą migawkę (patrz suita wyżej). Stub mierzy szczyt równoczesnych wywołań.
+let concStub = StubSession(runner: t)
+concStub.delayNanos = 20_000_000 // 20 ms — tyle, żeby wywołania zdążyły się nałożyć
+// ID dwucyfrowe z zerem wiodącym: stub dopasowuje klucze przez `contains`, więc „cw1"
+// trafiłoby także w URL projektu „cw11" i dało niejednoznaczne dopasowanie.
+let concIDs = (1...12).map { String(format: "cw%02d", $0) }
+concStub.responses["/v9/projects"] = (200, Data("""
+{"projects":[\(concIDs.map { #"{"id":"\#($0)","name":"\#($0)"}"# }.joined(separator: ","))]}
+""".utf8))
+for (i, pid) in concIDs.enumerated() {
+    concStub.responses["projectId=\(pid)"] = (200, Data("""
+    {"deployments":[{"uid":"d-\(pid)","state":"READY","createdAt":\(1754470000000 + i * 1000)}]}
+    """.utf8))
+}
+let concSnap = try await RefreshCore.fetch(api: VercelAPI(token: "t", session: concStub),
+                                           watchedProjectIDs: Set(concIDs))
+t.equal(concSnap.projects.count, 12, "okno dokłada zadania — wracają wszystkie projekty, nie pierwsze 4")
+t.check(concStub.maxInFlight <= 4, "szczyt równoległości \(concStub.maxInFlight) nie przekracza 4")
+t.check(concStub.maxInFlight >= 2, "requesty faktycznie biegną równolegle (szczyt \(concStub.maxInFlight))")
 
 // MARK: - KeychainStore
 

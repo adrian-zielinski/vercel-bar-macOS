@@ -12,11 +12,15 @@ struct ProjectRowView: View {
     private var isError: Bool { deploy?.state == .error }
     private var isBuilding: Bool { deploy?.state == .building || deploy?.state == .initializing }
 
+    /// Strzałka to obietnica otwarcia — wiersz bez adresów jej nie składa. `.disabled`
+    /// załatwiłoby to samo, ale przygasza całą treść i rozjeżdża wiersz z makietą.
+    private var showsOpenArrow: Bool {
+        hovered && (deploy?.inspectorURL != nil || deploy?.previewURL != nil)
+    }
+
     var body: some View {
         Button(action: open) { rowContent }
             .buttonStyle(.plain)
-            // Wiersz bez adresów nie ma czego otworzyć — niech nie udaje klikalnego.
-            .disabled(deploy?.inspectorURL == nil && deploy?.previewURL == nil)
             .background {
                 ZStack {
                     rowBackground
@@ -82,10 +86,10 @@ struct ProjectRowView: View {
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .opacity(hovered ? 1 : 0)
-                    .offset(x: hovered ? 0 : -6)
+                    .opacity(showsOpenArrow ? 1 : 0)
+                    .offset(x: showsOpenArrow ? 0 : -6)
                     .animation(reduceMotion ? nil : .spring(duration: 0.2, bounce: 0.3),
-                               value: hovered)
+                               value: showsOpenArrow)
             }
         }
         .padding(EdgeInsets(top: 7, leading: 9, bottom: 7, trailing: 8))
