@@ -35,7 +35,8 @@ struct ProjectRowView: View {
             .onHover { hovered = $0 }
             .accessibilityLabel("\(project.name), \(badgeLabel)")
             .accessibilityValue(accessibilityDetails)
-            .accessibilityHint("Otwiera deploy w przeglądarce")
+            .accessibilityHint(deploy?.inspectorURL != nil || deploy?.previewURL != nil
+                               ? "Otwiera deploy w przeglądarce" : "")
             .onChange(of: deploy?.state) { old, new in
                 guard !reduceMotion, old == .building || old == .initializing, new == .ready else { return }
                 // Koperta makiety `vb-flash 420ms`: szczyt przy 28 %, wygaszenie do 420 ms.
