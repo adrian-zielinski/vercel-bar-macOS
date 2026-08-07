@@ -50,7 +50,10 @@ public enum APIDecoding {
 
     struct UserEnvelope: Decodable {
         struct U: Decodable {
-            let uid: String
+            // /v2/user zwraca `id` (wg OpenAPI Vercela `uid` nie istnieje);
+            // `uid` zostaje jako fallback dla historycznych odpowiedzi.
+            let id: String?
+            let uid: String?
             let username: String
             let name: String?
         }
@@ -60,7 +63,7 @@ public enum APIDecoding {
     struct TeamsEnvelope: Decodable {
         struct Item: Decodable {
             let id: String
-            let name: String
+            let name: String? // nullable wg OpenAPI — zespół bez nazwy pokazujemy po slugu
             let slug: String
         }
         let teams: [Item]
@@ -105,11 +108,15 @@ public enum APIDecoding {
 
     public static func user(from data: Data) throws -> VercelUser {
         let u = try JSONDecoder().decode(UserEnvelope.self, from: data).user
-        return VercelUser(id: u.uid, username: u.username, name: u.name)
+        guard let id = u.id ?? u.uid else {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: [], debugDescription: "odpowiedź /v2/user bez id ani uid"))
+        }
+        return VercelUser(id: id, username: u.username, name: u.name)
     }
 
     public static func teams(from data: Data) throws -> [Team] {
         try JSONDecoder().decode(TeamsEnvelope.self, from: data)
-            .teams.map { Team(id: $0.id, name: $0.name, slug: $0.slug) }
+            .teams.map { Team(id: $0.id, name: $0.name ?? $0.slug, slug: $0.slug) }
     }
 }

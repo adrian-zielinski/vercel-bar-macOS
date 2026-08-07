@@ -19,6 +19,7 @@ final class AppModel: ObservableObject {
         case rejected        // Vercel odrzucił token (albo pusty)
         case network         // nie dojechaliśmy do Vercela — token nie jest niczemu winien
         case keychainFailure // token poprawny, ale zapis do pęku się nie powiódł
+        case unexpectedResponse // token zadziałał, ale odpowiedź API w nieznanym formacie
     }
 
     @Published var phase: Phase = .onboarding
@@ -196,6 +197,10 @@ final class AppModel: ObservableObject {
             }
         } catch is KeychainStore.KeychainError {
             return .keychainFailure
+        } catch is DecodingError {
+            // Odpowiedź przyszła (token zadziałał), ale nie umiemy jej sparsować —
+            // to błąd aplikacji/zmiana API, nie wina tokenu. Nie zwalaj na użytkownika.
+            return .unexpectedResponse
         } catch {
             return .rejected
         }

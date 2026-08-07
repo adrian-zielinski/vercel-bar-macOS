@@ -123,6 +123,7 @@ struct SettingsView: View {
         case .rejected: "Vercel odrzucił ten token. Sprawdź, czy skopiowany w całości."
         case .network: "Brak połączenia z Vercelem. Sprawdź internet i spróbuj ponownie."
         case .keychainFailure: "Token poprawny, ale zapis w pęku kluczy się nie powiódł. Otwórz Keychain Access i sprawdź dostęp."
+        case .unexpectedResponse: "Vercel odpowiedział w nieoczekiwanym formacie — to problem aplikacji, nie tokenu. Zgłoś to autorowi."
         default: "Token z panelu Vercela → Account Settings → Tokens. Zakres (scope): konto lub zespół, który chcesz obserwować."
         }
     }

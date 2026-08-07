@@ -161,18 +161,31 @@ do {
     t.equal(ps.map(\.name), ["sklep-online", "blog-firmowy"], "projekty: nazwy")
 } catch { t.check(false, "dekodowanie projektów rzuciło: \(error)") }
 
-let userJSON = Data(#"{"user":{"uid":"u_1","username":"marta","name":"Marta Kowalska"}}"#.utf8)
+let userJSON = Data(#"{"user":{"id":"u_1","username":"marta","name":"Marta Kowalska"}}"#.utf8)
 do {
     let u = try APIDecoding.user(from: userJSON)
+    t.equal(u.id, "u_1", "id z pola id (realny kształt /v2/user wg OpenAPI Vercela)")
     t.equal(u.username, "marta", "username")
     t.equal(u.name, "Marta Kowalska", "pełna nazwa")
 } catch { t.check(false, "dekodowanie usera rzuciło: \(error)") }
+
+let legacyUserJSON = Data(#"{"user":{"uid":"u_9","username":"jan","name":null}}"#.utf8)
+do {
+    let u = try APIDecoding.user(from: legacyUserJSON)
+    t.equal(u.id, "u_9", "fallback na historyczne uid")
+} catch { t.check(false, "dekodowanie legacy usera rzuciło: \(error)") }
 
 let teamsJSON = Data(#"{"teams":[{"id":"team_1","name":"Studio Nord","slug":"studio-nord"}]}"#.utf8)
 do {
     let ts = try APIDecoding.teams(from: teamsJSON)
     t.equal(ts.first?.slug, "studio-nord", "team slug")
 } catch { t.check(false, "dekodowanie teamów rzuciło: \(error)") }
+
+let namelessTeamJSON = Data(#"{"teams":[{"id":"team_2","name":null,"slug":"cichy-team"}]}"#.utf8)
+do {
+    let ts = try APIDecoding.teams(from: namelessTeamJSON)
+    t.equal(ts.first?.name, "cichy-team", "team bez nazwy spada na slug (name nullable wg OpenAPI)")
+} catch { t.check(false, "dekodowanie teamu bez nazwy rzuciło: \(error)") }
 
 // MARK: - Agregacja stanu
 
@@ -452,7 +465,7 @@ final class StubSession: HTTPSession, @unchecked Sendable {
 
 t.suite("VercelAPI — nagłówki i parametry")
 let stub = StubSession(runner: t)
-stub.responses["/v2/user"] = (200, Data(#"{"user":{"uid":"u1","username":"marta","name":null}}"#.utf8))
+stub.responses["/v2/user"] = (200, Data(#"{"user":{"id":"u1","username":"marta","name":null}}"#.utf8))
 let api = VercelAPI(token: "tok_123", teamID: "team_9", session: stub)
 let user = try await api.user()
 t.equal(user.username, "marta", "user dekoduje się")
