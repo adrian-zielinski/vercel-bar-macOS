@@ -54,8 +54,8 @@ security delete-generic-password -s pl.zielinski.vercelbar
 Requires Swift 6+ (Command Line Tools from Xcode 16 or newer). No third-party dependencies.
 
 ```bash
-git clone <this-repo>
-cd VercelBar
+git clone https://github.com/adrian-zielinski/vercelbar.git
+cd vercelbar
 
 # Build build/VercelBar.app and build/VercelBar.zip
 ./Scripts/build-app.sh
