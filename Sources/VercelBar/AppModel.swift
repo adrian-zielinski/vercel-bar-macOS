@@ -118,7 +118,10 @@ final class AppModel: ObservableObject {
             // Chwilowa niedostępność pęku (np. ACL po aktualizacji podpisu) nie zrywa sesji;
             // dopiero seria porażek znaczy trwały problem i wymaga wyjścia przez Ustawienia.
             keychainReadFailures += 1
-            if keychainReadFailures >= 3 { phase = .tokenInvalid }
+            if keychainReadFailures >= 3 {
+                phase = .tokenInvalid
+                updatePulse(active: false)
+            }
             return
         }
         guard let token = storedToken else {
