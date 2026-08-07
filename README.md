@@ -62,13 +62,23 @@ The script downloads the latest release into Applications and launches it. Termi
 2. Click the triangle → **Connect to Vercel** → paste the token.
 3. Open the **Projects** tab and check the projects you care about.
 
-VercelBar polls the Vercel API every 30 seconds, and every 10 seconds while a build runs. On API errors it backs off exponentially, up to 5 minutes. macOS will ask for notification permission on first launch and for keychain access after an app update; choose "Always Allow" and it stays quiet.
+VercelBar polls the Vercel API every 30 seconds, and every 10 seconds while a build runs. On API errors it backs off exponentially, up to 5 minutes. macOS asks for notification permission on first launch and for keychain access the first time it reads your token; choose "Always Allow" and it stays quiet.
+
+## Notifications
+
+Every watched deploy gets a banner with a sound: 🚀 when a build starts, ✅ when it ships, ❌ when it fails.
+
+macOS grants native notification permission only to apps whose signature it trusts, and VercelBar ships without a paid Apple signature. When the system withholds that permission — the consent dialog simply never appears — VercelBar sends the same notifications through `osascript`, the built-in scripting tool, which works regardless of signature. One difference: a banner sent that way does not belong to VercelBar, so clicking it opens nothing. Open the deploy from the popover row instead.
+
+Settings → Account has a **Test notification** button. It sends a notification down whichever path is active, so one click tells you whether they arrive at all.
+
+Releases are signed with a stable local certificate. macOS therefore recognizes each update as the same app, and the keychain asks about your token once instead of after every version.
 
 ## Updates
 
 Once a day VercelBar asks GitHub Releases whether a newer version exists — a single anonymous request, no account, no telemetry. When one is out, a bar shows up above the popover footer: click **Update** and the app downloads the release, checks that the bundle inside carries the right identifier and version, swaps itself in place (the old copy goes to the Trash) and relaunches on the new version. If any step fails, the release page opens in your browser and the running app stays exactly as it was. Settings → Account has a **Check for updates** button for the impatient.
 
-The app is signed ad-hoc, so macOS treats every new build as a new app: right after an update it asks once for keychain access to read your token. Choose "Always Allow" and it stays quiet.
+Builds up to 1.2.1 were signed ad-hoc, which made macOS treat every new build as a new app and ask for keychain access after each update. From 1.2.2 on, releases carry a stable local signature, so that prompt appears once — choose "Always Allow" and it stays quiet.
 
 ## Uninstall
 

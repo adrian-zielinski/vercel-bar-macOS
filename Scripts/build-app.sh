@@ -9,7 +9,7 @@ cd "$ROOT"
 
 APP_NAME="VercelBar"
 BUNDLE_ID="pl.zielinski.vercelbar"
-VERSION="1.2.1"
+VERSION="1.2.2"
 OUT_DIR="$ROOT/build"
 STAGE_ROOT="$(mktemp -d)"
 STAGE="$STAGE_ROOT/$APP_NAME.app"
@@ -54,11 +54,23 @@ cat > "$STAGE/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-echo "▸ Czyszczenie atrybutów i podpis ad-hoc..."
+echo "▸ Czyszczenie atrybutów i podpis..."
 xattr -cr "$STAGE"
 find "$STAGE" -name '._*' -delete 2>/dev/null || true
 find "$STAGE" -name '.DS_Store' -delete 2>/dev/null || true
-codesign --force --sign - "$STAGE"
+
+SIGN_ID="${VERCELBAR_SIGN_ID:-VercelBar Local Signing}"
+# Szukamy bez `-v`: certyfikat jest własnoręczny, więc nie ma go w magazynie
+# zaufania systemu i `-v` (tylko zaufane) by go pominął. codesign podpisuje nim mimo to.
+if security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
+    echo "▸ Podpis tożsamością: $SIGN_ID"
+    codesign --force --deep --sign "$SIGN_ID" "$STAGE"
+else
+    # Bez stałej tożsamości macOS traktuje każdą wersję jak inną aplikację:
+    # powiadomienia nie działają, a pęk kluczy pyta po każdej aktualizacji.
+    echo "▸ UWAGA: brak tożsamości \"$SIGN_ID\" — podpis ad-hoc (powiadomienia mogą nie działać)"
+    codesign --force --sign - "$STAGE"
+fi
 
 echo "▸ Weryfikacja podpisu..."
 codesign --verify --deep --strict "$STAGE" && echo "  podpis OK"

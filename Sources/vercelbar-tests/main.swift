@@ -370,6 +370,51 @@ t.equal(plTexts.updateDamaged, "Paczka aktualizacji jest uszkodzona. Otworzyłem
 t.equal(enTexts.updateDamaged, "The update package is damaged. The release page is open in your browser.",
         "komunikat uszkodzonej paczki po angielsku")
 
+t.suite("L10n — teksty testu powiadomień")
+t.equal(plTexts.sendTestNotification, "Testuj powiadomienie", "przycisk testu po polsku")
+t.equal(enTexts.sendTestNotification, "Test notification", "przycisk testu po angielsku")
+t.equal(plTexts.testNotificationTitle, "VercelBar działa", "tytuł testu po polsku")
+t.equal(enTexts.testNotificationTitle, "VercelBar is working", "tytuł testu po angielsku")
+t.equal(plTexts.testNotificationBody, "Tak będą wyglądać powiadomienia o deployach.",
+        "treść testu po polsku")
+t.equal(enTexts.testNotificationBody, "This is how deploy notifications will look.",
+        "treść testu po angielsku")
+
+// MARK: - Argumenty powiadomienia zapasowego
+
+t.suite("ScriptNotification — kolejność argumentów")
+let plainArgs = ScriptNotification.arguments(title: "Tytuł", body: "Treść")
+t.equal(plainArgs.count, 5, "pięć argumentów: -e, skrypt, --, treść, tytuł")
+t.equal(plainArgs[0], "-e", "skrypt idzie przez -e")
+t.equal(plainArgs[1], ScriptNotification.script, "drugi argument to skrypt")
+// Bez `--` osascript zjada treść zaczynającą się od myślnika jako własną opcję.
+t.equal(plainArgs[2], "--", "separator kończy listę opcji osascripta")
+t.equal(plainArgs[3], "Treść", "treść przed tytułem — tak czyta ją `item 1 of argv`")
+t.equal(plainArgs[4], "Tytuł", "tytuł na końcu — `item 2 of argv`")
+t.check(ScriptNotification.script.contains("item 1 of argv"),
+        "skrypt bierze treść z argv, nie ze sklejenia")
+
+t.suite("ScriptNotification — treść wroga trafia jako dane")
+// Nazwy projektów i komunikaty commitów są danymi zewnętrznymi: cudzysłów,
+// apostrof, nowa linia i `$(whoami)` muszą przejść dosłownie i nie wolno im
+// wylądować w kodzie skryptu.
+let hostileBody = "\"quote\" 'apo' $(whoami) `id`\ndruga linia \\ koniec"
+let hostileTitle = "▲ \"projekt\"; do shell script \"rm -rf /\""
+let hostileArgs = ScriptNotification.arguments(title: hostileTitle, body: hostileBody)
+t.equal(hostileArgs[3], hostileBody, "treść przechodzi bez zmian, znak w znak")
+t.equal(hostileArgs[4], hostileTitle, "tytuł przechodzi bez zmian, znak w znak")
+t.check(!hostileArgs[1].contains("quote"), "skrypt nie zawiera treści użytkownika")
+t.check(!hostileArgs[1].contains("whoami"), "skrypt nie zawiera podstawienia powłoki z treści")
+t.check(!hostileArgs[1].contains("rm -rf"), "skrypt nie zawiera tytułu użytkownika")
+t.equal(hostileArgs[1], ScriptNotification.script, "skrypt jest stałą, niezależną od danych")
+
+// Argument zaczynający się od myślnika — najczęstszy powód, dla którego wywołanie
+// bez separatora kończy się „illegal option" zamiast powiadomieniem.
+let dashArgs = ScriptNotification.arguments(title: "-l", body: "-e rm")
+t.equal(dashArgs[2], "--", "separator jest też przy treści zaczynającej się od myślnika")
+t.equal(dashArgs[3], "-e rm", "treść z myślnikiem przechodzi jako dane")
+t.equal(dashArgs[4], "-l", "tytuł z myślnikiem przechodzi jako dane")
+
 // MARK: - Silnik powiadomień
 
 func summary(id: String, state: DeployState) -> DeploymentSummary {

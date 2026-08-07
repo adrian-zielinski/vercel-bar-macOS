@@ -5,6 +5,12 @@ import VercelBarKit
 
 /// Wysyła powiadomienia systemowe i otwiera deploy po kliknięciu.
 /// UNUserNotificationCenter wymaga bundla .app — przy `swift run` tylko logujemy.
+///
+/// Dwie drogi wysyłki. Natywna (UNUserNotificationCenter) daje klikalny baner,
+/// ale macOS przyznaje ją tylko aplikacjom, którym ufa. Przy podpisie, którego
+/// system nie zna, `requestAuthorization` potrafi nigdy nie zawołać callbacka —
+/// dialog zgody się nie pokazuje i żadne powiadomienie nie wychodzi. Wtedy
+/// wchodzi droga zapasowa przez osascript, która działa niezależnie od podpisu.
 final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationPresenter()
 
@@ -16,11 +22,45 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
 
     private var available: Bool { Bundle.main.bundleIdentifier != nil }
 
+    /// Czy wolno korzystać z drogi natywnej. Domyślnie nie — dopiero potwierdzone
+    /// uprawnienie je włącza. Czytane i pisane wyłącznie na głównym wątku.
+    private var nativeAllowed = false
+
+    /// Ile czekamy na odpowiedź systemu o uprawnieniach. Bez limitu milczenie
+    /// systemu zablokowałoby powiadomienia na zawsze — po limicie idziemy drogą zapasową.
+    private static let settingsTimeout: TimeInterval = 3
+
     func setUp() {
         guard available else { return }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
+        // Odpalamy i idziemy dalej: przy podpisie, któremu system nie ufa,
+        // ten callback nie przychodzi nigdy. O stan pytamy osobno, z limitem czasu.
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        checkAuthorization()
+    }
+
+    /// Pyta o faktyczny stan uprawnień i zapisuje wynik. Odpowiedź po limicie
+    /// czasu jest ignorowana — inaczej stan przełączyłby się w środku sesji.
+    private func checkAuthorization() {
+        var answered = false
+        let deadline = DispatchWorkItem { [weak self] in
+            guard !answered else { return }
+            answered = true
+            self?.nativeAllowed = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.settingsTimeout, execute: deadline)
+
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let granted = settings.authorizationStatus == .authorized
+                || settings.authorizationStatus == .provisional
+            DispatchQueue.main.async {
+                guard !answered else { return }
+                answered = true
+                deadline.cancel()
+                self.nativeAllowed = granted
+            }
+        }
     }
 
     func show(event: DeployEvent) {
@@ -49,6 +89,10 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
             print("POWIADOMIENIE: \(title) — \(body)")
             return
         }
+        guard nativeAllowed else {
+            showViaAppleScript(title: title, body: body)
+            return
+        }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -61,13 +105,49 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
 
     func showTokenInvalid() {
         let l10n = currentL10n
-        guard available else { print("POWIADOMIENIE: \(l10n.tokenInvalidNotificationTitle)"); return }
+        send(title: l10n.tokenInvalidNotificationTitle,
+             body: l10n.tokenInvalidNotificationBody,
+             identifier: "token-invalid")
+    }
+
+    /// Powiadomienie z przycisku w Ustawieniach — pokazuje, którą drogą
+    /// aplikacja faktycznie wysyła i czy w ogóle coś dociera.
+    func showTest() {
+        let l10n = currentL10n
+        send(title: l10n.testNotificationTitle,
+             body: l10n.testNotificationBody,
+             identifier: "test-notification")
+    }
+
+    /// Powiadomienie bez URL-a: natywnie albo drogą zapasową.
+    private func send(title: String, body: String, identifier: String) {
+        guard available else {
+            print("POWIADOMIENIE: \(title) — \(body)")
+            return
+        }
+        guard nativeAllowed else {
+            showViaAppleScript(title: title, body: body)
+            return
+        }
         let content = UNMutableNotificationContent()
-        content.title = l10n.tokenInvalidNotificationTitle
-        content.body = l10n.tokenInvalidNotificationBody
+        content.title = title
+        content.body = body
         content.sound = .default
         UNUserNotificationCenter.current().add(
-            UNNotificationRequest(identifier: "token-invalid", content: content, trigger: nil))
+            UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+
+    /// Powiadomienie przez systemowy mechanizm skryptów — działa nawet, gdy macOS
+    /// nie ufa naszemu podpisowi. Tytuł i treść idą argumentami: komunikat commita
+    /// może zawierać cudzysłowy i nie wolno mu trafić do kodu skryptu.
+    ///
+    /// Ograniczenie: baner z tej drogi nie należy do nas, więc kliknięcie w niego
+    /// nie otwiera deployu (wiersz w popoverze nadal otwiera).
+    private func showViaAppleScript(title: String, body: String) {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        p.arguments = ScriptNotification.arguments(title: title, body: body)
+        try? p.run()
     }
 
     // Klik w powiadomienie otwiera deploy.

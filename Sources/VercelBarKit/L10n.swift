@@ -229,4 +229,17 @@ public struct L10n: Sendable {
         t("Otwórz Ustawienia i wklej nowy token dostępu.",
           "Open Settings and paste a new access token.")
     }
+
+    public var sendTestNotification: String {
+        t("Testuj powiadomienie", "Test notification")
+    }
+
+    public var testNotificationTitle: String {
+        t("VercelBar działa", "VercelBar is working")
+    }
+
+    public var testNotificationBody: String {
+        t("Tak będą wyglądać powiadomienia o deployach.",
+          "This is how deploy notifications will look.")
+    }
 }

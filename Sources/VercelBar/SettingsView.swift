@@ -151,12 +151,22 @@ struct SettingsView: View {
             // Poza bundlem (`swift run`) nie ma ani wersji, ani co aktualizować — wiersz znika.
             if let version = model.currentVersion {
                 row(label: l10n.versionLabel(version: version)) {
-                    HStack(spacing: 9) {
-                        Button(l10n.checkForUpdates) { runUpdateCheck() }
-                            .disabled(checkingUpdates)
-                        if checkingUpdates {
-                            ProgressView().controlSize(.small)
-                        } else if let checkResult {
+                    // Wynik sprawdzenia schodzi pod przyciski: dwa przyciski i zdanie
+                    // obok siebie nie mieszczą się w 480 pt okna.
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 9) {
+                            Button(l10n.checkForUpdates) { runUpdateCheck() }
+                                .disabled(checkingUpdates)
+                            // Powiadomienia zależą od zgody, której macOS potrafi nie przyznać
+                            // po cichu — bez przycisku nie da się sprawdzić, czy docierają.
+                            Button(l10n.sendTestNotification) {
+                                NotificationPresenter.shared.showTest()
+                            }
+                            if checkingUpdates {
+                                ProgressView().controlSize(.small)
+                            }
+                        }
+                        if !checkingUpdates, let checkResult {
                             Text(checkResult)
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(.secondary)

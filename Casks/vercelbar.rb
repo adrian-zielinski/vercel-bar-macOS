@@ -1,5 +1,5 @@
 cask "vercelbar" do
-  version "1.2.1"
+  version "1.2.2"
   sha256 "312237378065429642fc6e897fa27df25bf14172d1d7b1f3e507ceff9084c590"
 
   url "https://github.com/adrian-zielinski/vercel-bar-macOS/releases/download/v#{version}/VercelBar.zip"
