@@ -11,6 +11,7 @@ public final class SettingsStore {
         static let notifyStart = "notifyStart"
         static let feedLimit = "feedLimit"
         static let teamID = "teamID"
+        static let languageOverride = "languageOverride"
     }
 
     /// Wartości oferowane w Ustawieniach; wprost sterują też parametrem `limit` zapytania o deploye.
@@ -56,6 +57,17 @@ public final class SettingsStore {
     private static func sanitized(_ value: Int?) -> Int {
         guard let value, allowedFeedLimits.contains(value) else { return defaultFeedLimit }
         return value
+    }
+
+    /// Ręczny wybór języka UI; nil = podążaj za systemem. Nieznany kod (ręczna edycja
+    /// plist, plik po innej wersji) czytamy jak brak wyboru — lepiej wrócić do systemu
+    /// niż wywalić się na nieistniejącym języku.
+    public var languageOverride: Lang? {
+        get { Lang(rawValue: defaults.string(forKey: Key.languageOverride) ?? "") }
+        set {
+            if let newValue { defaults.set(newValue.rawValue, forKey: Key.languageOverride) }
+            else { defaults.removeObject(forKey: Key.languageOverride) }
+        }
     }
 
     /// nil = konto osobiste.

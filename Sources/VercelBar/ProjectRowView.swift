@@ -7,7 +7,7 @@ struct ProjectRowView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered = false
     @State private var flash = false
-    private let l10n = L10n()
+    @Environment(\.l10n) private var l10n
 
     private var deploy: DeploymentSummary { entry.deployment }
     private var isError: Bool { deploy.state == .error }
@@ -76,7 +76,7 @@ struct ProjectRowView: View {
             Spacer(minLength: 8)
             HStack(spacing: 3) {
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(deploy.createdAt.map { Format.relative($0) } ?? "")
+                    Text(deploy.createdAt.map { Format.relative($0, lang: l10n.lang) } ?? "")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)

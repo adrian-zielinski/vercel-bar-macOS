@@ -8,7 +8,11 @@ import VercelBarKit
 final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationPresenter()
 
-    private let l10n = L10n()
+    /// Presenter to singleton żyjący całą sesję, więc język bierzemy w chwili wysyłki —
+    /// inaczej powiadomienia zostałyby w języku sprzed przełączenia w Ustawieniach.
+    private var currentL10n: L10n {
+        L10n(lang: Lang.effective(override: SettingsStore().languageOverride))
+    }
 
     private var available: Bool { Bundle.main.bundleIdentifier != nil }
 
@@ -20,6 +24,7 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func show(event: DeployEvent) {
+        let l10n = currentL10n
         let d = event.deployment
         let branch = d.branch ?? "?"
         let title: String
@@ -55,6 +60,7 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func showTokenInvalid() {
+        let l10n = currentL10n
         guard available else { print("POWIADOMIENIE: \(l10n.tokenInvalidNotificationTitle)"); return }
         let content = UNMutableNotificationContent()
         content.title = l10n.tokenInvalidNotificationTitle

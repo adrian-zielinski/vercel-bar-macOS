@@ -210,6 +210,13 @@ t.equal(Lang.system(preferred: ["de-DE"]), .en, "niemiecki → angielski, nie po
 t.equal(Lang.system(preferred: []), .en, "brak preferencji → angielski")
 t.equal(Lang.system(preferred: ["en-US", "pl-PL"]), .en, "liczy się tylko pierwszy język")
 
+t.suite("Lang.effective — ręczny wybór z Ustawień")
+t.equal(Lang.effective(override: .en, preferred: ["pl-PL"]), .en, "wybór en wygrywa z polskim systemem")
+t.equal(Lang.effective(override: .pl, preferred: ["en-US"]), .pl, "wybór pl wygrywa z angielskim systemem")
+t.equal(Lang.effective(override: nil, preferred: ["pl-PL"]), .pl, "brak wyboru → system (pl)")
+t.equal(Lang.effective(override: nil, preferred: ["de-DE"]), .en, "brak wyboru → system (nie-pl → en)")
+t.equal(Lang.effective(override: nil, preferred: []), .en, "brak wyboru i brak preferencji → en")
+
 t.suite("Nagłówek popovera")
 t.equal(StatusAggregator.headline(for: [.ready, .ready], lang: .pl), "Wszystko wdrożone", "nagłówek ready")
 t.equal(StatusAggregator.headline(for: [.ready, .building], lang: .pl), "Build w toku…", "nagłówek building")
@@ -301,6 +308,10 @@ t.equal(plTexts.refreshedAt("12:04"), "odświeżono 12:04", "stopka nagłówka p
 t.equal(enTexts.refreshedAt("12:04"), "refreshed 12:04", "stopka nagłówka po angielsku")
 t.equal(plTexts.monitoredCount(3, 12), "3 z 12 projektów monitorowanych", "licznik projektów po polsku")
 t.equal(enTexts.monitoredCount(3, 12), "3 of 12 projects monitored", "licznik projektów po angielsku")
+t.equal(plTexts.languageLabel, "Język", "etykieta języka po polsku")
+t.equal(enTexts.languageLabel, "Language", "etykieta języka po angielsku")
+t.equal(plTexts.languageSystem, "Systemowy", "opcja systemowa po polsku")
+t.equal(enTexts.languageSystem, "System", "opcja systemowa po angielsku")
 t.equal(plTexts.unknownTeam(idPrefix: "team_abc123"), "Zespół (team_abc123…)", "nieznany zespół po polsku")
 t.equal(enTexts.unknownTeam(idPrefix: "team_abc123"), "Team (team_abc123…)", "nieznany zespół po angielsku")
 t.equal(plTexts.deployFailedTitle(project: "sklep"), "❌ sklep: deploy padł", "tytuł porażki po polsku")
@@ -982,6 +993,21 @@ defaults.set(7, forKey: "feedLimit")
 t.equal(settings.feedLimit, 5, "wartość spoza 3/5/10 czytana jako 5")
 defaults.set(0, forKey: "feedLimit")
 t.equal(settings.feedLimit, 5, "zero czytane jako 5")
+
+t.suite("SettingsStore — ręczny wybór języka")
+t.equal(SettingsStore(defaults: defaults).languageOverride, nil, "domyślnie język za systemem")
+settings.languageOverride = .pl
+t.equal(SettingsStore(defaults: defaults).languageOverride, .pl, "wybór polskiego trwa po ponownym wczytaniu")
+settings.languageOverride = .en
+t.equal(SettingsStore(defaults: defaults).languageOverride, .en, "wybór angielskiego trwa po ponownym wczytaniu")
+settings.languageOverride = nil
+t.equal(SettingsStore(defaults: defaults).languageOverride, nil, "powrót do systemowego czyści klucz")
+// Ręczna edycja plist albo plik po innej wersji nie może wywrócić języka.
+defaults.set("klingon", forKey: "languageOverride")
+t.equal(settings.languageOverride, nil, "nieznany kod czytany jako systemowy")
+defaults.set(42, forKey: "languageOverride")
+t.equal(settings.languageOverride, nil, "wartość innego typu czytana jako systemowy")
+defaults.removeObject(forKey: "languageOverride")
 defaults.set(-2, forKey: "feedLimit")
 t.equal(settings.feedLimit, 5, "wartość ujemna czytana jako 5")
 defaults.set("dużo", forKey: "feedLimit")

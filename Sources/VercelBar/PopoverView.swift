@@ -7,7 +7,7 @@ struct PopoverView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
-    private let l10n = L10n()
+    @Environment(\.l10n) private var l10n
 
     /// Puls kropki nagłówka żyje lokalnie — `model.iconAlpha` zostaje wyłącznie dla ikony w pasku menu.
     private var pulsing: Bool { model.iconState == .building && !reduceMotion }
@@ -50,7 +50,8 @@ struct PopoverView: View {
         switch model.phase {
         case .offline: l10n.headlineOffline
         case .tokenInvalid: l10n.headlineTokenInvalid
-        default: StatusAggregator.headline(for: model.projects.map { $0.latest?.state ?? .unknown })
+        default: StatusAggregator.headline(for: model.projects.map { $0.latest?.state ?? .unknown },
+                                           lang: l10n.lang)
         }
     }
 

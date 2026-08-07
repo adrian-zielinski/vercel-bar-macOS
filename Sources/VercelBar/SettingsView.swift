@@ -11,7 +11,7 @@ struct SettingsView: View {
         case projects
     }
 
-    private let l10n = L10n()
+    @Environment(\.l10n) private var l10n
     @State private var tab: Tab = .account
     @State private var tokenField = ""
     @State private var connectProblem: AppModel.ConnectResult?
@@ -126,6 +126,21 @@ struct SettingsView: View {
                 }
                 .labelsHidden()
                 .frame(width: 196)
+            }
+
+            row(label: l10n.languageLabel) {
+                Picker("", selection: Binding(
+                    get: { model.settings.languageOverride },
+                    set: { model.setLanguage($0) }
+                )) {
+                    Text(l10n.languageSystem).tag(Lang?.none)
+                    // Nazwy języków w nich samych — po angielsku „Polski" nikomu nic nie mówi.
+                    Text("Polski").tag(Lang?.some(.pl))
+                    Text("English").tag(Lang?.some(.en))
+                }
+                .labelsHidden()
+                .frame(width: 196)
+                .accessibilityLabel(l10n.languageLabel)
             }
         }
     }

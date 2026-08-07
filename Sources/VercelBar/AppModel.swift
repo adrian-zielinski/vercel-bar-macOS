@@ -33,6 +33,9 @@ final class AppModel: ObservableObject {
     @Published var account: VercelUser?
     @Published var teams: [Team] = []
     @Published var hasToken = false // dla UI — widoki nie dotykają Keychaina w body
+    /// Język faktycznie pokazywany; wstrzykiwany widokom przez `\.l10n`, więc przełącznik
+    /// w Ustawieniach przerysowuje UI od razu, bez restartu.
+    @Published var lang: Lang = .system()
 
     let keychain = KeychainStore()
     let settings = SettingsStore()
@@ -51,6 +54,10 @@ final class AppModel: ObservableObject {
     private var keychainReadFailures = 0 // pojedyncza czkawka pęku ≠ utrata sesji
     private var refreshInFlight = false
     private var refreshQueued = false
+
+    init() {
+        lang = Lang.effective(override: settings.languageOverride)
+    }
 
     var iconState: AggregateState {
         switch phase {
@@ -267,6 +274,15 @@ final class AppModel: ObservableObject {
         objectWillChange.send()
         settings.feedLimit = limit
         Task { await refresh() }
+    }
+
+    /// `objectWillChange` jak wyżej: gdy ręczny wybór trafia w ten sam język co systemowy
+    /// (system polski, użytkownik klika „Polski"), `lang` się nie zmienia i sam Picker
+    /// cofnąłby zaznaczenie na „Systemowy".
+    func setLanguage(_ override: Lang?) {
+        objectWillChange.send()
+        settings.languageOverride = override
+        lang = Lang.effective(override: override)
     }
 
     func selectTeam(id: String?) {

@@ -13,7 +13,7 @@ A small triangle sits in your menu bar and shows the state of your deploys at a 
 - ✅ **Notifications with sound**: 🚀 when a deploy starts, ✅ when it ships (click opens the preview), ❌ when it fails (click opens the logs)
 - ✅ **Teams**: watch your personal account or any team you belong to
 - ✅ **Token lives in the Keychain**, never in a file
-- ✅ **English + Polish**, following your system language
+- ✅ **English + Polish**: follows your system language, or pick one in Settings and the UI switches instantly
 - ✅ **Light and dark mode**, respects Reduce Motion
 - ✅ **Tiny native Swift app**: 1.4 MB on disk, zero dependencies, no Electron
 
@@ -95,7 +95,7 @@ Known limits: the project list caps at 100 entries (no pagination yet). Because 
 
 ## Languages
 
-The app ships with English and Polish and follows the system language. Strings live in [`Sources/VercelBarKit/L10n.swift`](Sources/VercelBarKit/L10n.swift); pull requests with new languages are welcome.
+The app ships with English and Polish. By default it follows your system language; Settings → Account → Language lets you pin one, and the whole UI redraws immediately — no restart. Strings live in [`Sources/VercelBarKit/L10n.swift`](Sources/VercelBarKit/L10n.swift); pull requests with new languages are welcome.
 
 ## License
 

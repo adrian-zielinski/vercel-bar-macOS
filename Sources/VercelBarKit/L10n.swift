@@ -1,7 +1,9 @@
 import Foundation
 
-/// Język UI. Wybierany raz za systemem: polski system → pl, każdy inny → en.
-public enum Lang: Sendable, Equatable {
+/// Język UI. Domyślnie za systemem (polski system → pl, każdy inny → en),
+/// z możliwością ręcznego wyboru w Ustawieniach.
+/// `String` rawValue niesie zapis w UserDefaults („pl"/„en").
+public enum Lang: String, Sendable, Equatable {
     case pl
     case en
 
@@ -10,9 +12,16 @@ public enum Lang: Sendable, Equatable {
     public static func system(preferred: [String] = Locale.preferredLanguages) -> Lang {
         preferred.first?.lowercased().hasPrefix("pl") == true ? .pl : .en
     }
+
+    /// Język faktycznie użyty: ręczny wybór z Ustawień, a bez niego system.
+    public static func effective(override: Lang?,
+                                 preferred: [String] = Locale.preferredLanguages) -> Lang {
+        override ?? system(preferred: preferred)
+    }
 }
 
-/// Teksty UI. Instancja trzymana przez widoki; język rozstrzygany raz przy starcie.
+/// Teksty UI. Widoki dostają instancję przez Environment (`\.l10n`), więc zmiana
+/// języka w Ustawieniach przerysowuje je od razu.
 public struct L10n: Sendable {
     public let lang: Lang
 
@@ -128,6 +137,11 @@ public struct L10n: Sendable {
     public var projectsEmptyNoToken: String {
         t("Połącz konto w zakładce Konto.", "Connect your account in the Account tab.")
     }
+
+    public var languageLabel: String { t("Język", "Language") }
+    /// Nazwy samych języków („Polski", „English") celowo nietłumaczone — każdy ma
+    /// rozpoznać swój w liście. Tłumaczymy tylko pozycję „za systemem".
+    public var languageSystem: String { t("Systemowy", "System") }
 
     public var feedLimitLabel: String { t("Historia deployów", "Deploy history") }
     public var launchAtLogin: String { t("Uruchamiaj przy logowaniu", "Launch at login") }
