@@ -50,9 +50,20 @@ public struct DeploymentSummary: Equatable, Sendable {
     }
 
     /// Czas budowania w sekundach (dla zakończonych deployów ze znanym początkiem).
+    /// Trwający build (i `ready` skopiowane z `createdAt` przez API) zostaje `nil` —
+    /// UI liczy stoper na żywo przez `elapsed(at:)`.
     public var duration: TimeInterval? {
-        guard let readyAt, let start = buildingAt ?? createdAt else { return nil }
-        return readyAt.timeIntervalSince(start)
+        guard !state.isActive, let readyAt, let start = buildingAt ?? createdAt else { return nil }
+        let seconds = readyAt.timeIntervalSince(start)
+        return seconds >= 0 ? seconds : nil
+    }
+
+    /// Czas do pokazania w wierszu: stały po zakończeniu, żywy w trakcie.
+    /// `now` jest argumentem, żeby testy i `TimelineView` nie zależeć od zegara systemowego.
+    public func elapsed(at now: Date = Date()) -> TimeInterval? {
+        if let done = duration { return done }
+        guard state.isActive, let start = buildingAt ?? createdAt else { return nil }
+        return max(0, now.timeIntervalSince(start))
     }
 }
 

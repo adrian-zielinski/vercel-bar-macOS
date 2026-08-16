@@ -142,32 +142,26 @@ struct ProjectRowView: View {
         }
     }
 
-    /// Trwający build tyka co sekundę; zakończony deploy ma stałą wartość i nie potrzebuje harmonogramu.
+    /// Trwający build (i kolejka) tyka co sekundę; zakończony deploy ma stałą wartość.
     @ViewBuilder private var durationLabel: some View {
-        if deploy.duration == nil, isBuilding {
-            TimelineView(.periodic(from: .now, by: 1)) { _ in durationChip }
+        if deploy.state.isActive {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                durationChip(now: context.date)
+            }
         } else {
-            durationChip
+            durationChip(now: .now)
         }
     }
 
-    @ViewBuilder private var durationChip: some View {
-        if let text = durationText {
+    @ViewBuilder private func durationChip(now: Date) -> some View {
+        if let seconds = deploy.elapsed(at: now) {
             HStack(spacing: 3) {
                 Image(systemName: "stopwatch").font(.system(size: 7.5))
-                Text(text).monospacedDigit()
+                Text(Format.duration(seconds)).monospacedDigit()
             }
             .font(.system(size: 9.5))
             .foregroundStyle(.tertiary)
         }
-    }
-
-    private var durationText: String? {
-        if let done = deploy.duration { return Format.duration(done) }
-        if isBuilding, let start = deploy.buildingAt ?? deploy.createdAt {
-            return Format.duration(Date().timeIntervalSince(start))
-        }
-        return nil
     }
 
     private var rowBackground: some View {

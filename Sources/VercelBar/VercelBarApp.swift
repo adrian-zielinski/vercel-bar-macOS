@@ -26,8 +26,7 @@ struct VercelBarApp: App {
                 .environment(\.l10n, L10n(lang: model.lang))
                 .onAppear { model.start() }
         } label: {
-            Image(nsImage: StatusIconRenderer.image(state: model.iconState,
-                                                    alpha: model.iconAlpha))
+            StatusIconLabel(state: model.iconState, pulsing: model.shouldPulse)
                 .onAppear { model.start() } // etykieta renderuje się od razu — pętla rusza bez klikania
         }
         .menuBarExtraStyle(.window)
@@ -40,5 +39,29 @@ struct VercelBarApp: App {
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+    }
+}
+
+/// Jedna NSImage na stan. Puls to `opacity` w TimelineView (8 FPS), bez alokacji trójkąta
+/// i bez `@Published` na całym AppModel co 100 ms.
+private struct StatusIconLabel: View {
+    let state: AggregateState
+    let pulsing: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let image = StatusIconRenderer.image(state: state)
+        if pulsing && !reduceMotion {
+            TimelineView(.periodic(from: .now, by: StatusIconRenderer.pulseFrameInterval)) { context in
+                Image(nsImage: image)
+                    .opacity(StatusIconRenderer.pulseAlpha(
+                        phase: StatusIconRenderer.pulsePhase(at: context.date)))
+                    .id(colorScheme)
+            }
+        } else {
+            Image(nsImage: image)
+                .id(colorScheme)
+        }
     }
 }

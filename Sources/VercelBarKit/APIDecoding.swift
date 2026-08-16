@@ -69,8 +69,11 @@ public enum APIDecoding {
         let teams: [Item]
     }
 
+    /// 0 i liczby ujemne to brak daty — Vercel wysyła `ready: 0` przy jeszcze niegotowym deployu.
+    /// Sentinel 1970 psuł `duration` (ujemny czas → „0 s" w UI).
     private static func date(fromMs ms: Double?) -> Date? {
-        ms.map { Date(timeIntervalSince1970: $0 / 1000) }
+        guard let ms, ms > 0 else { return nil }
+        return Date(timeIntervalSince1970: ms / 1000)
     }
 
     /// Gałąź/commit siedzą w meta pod kluczem zależnym od dostawcy gita.

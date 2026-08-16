@@ -8,6 +8,16 @@ public enum StatusIconRenderer {
         0.55 + 0.45 * (0.5 - 0.5 * cos(2 * .pi * phase))
     }
 
+    public static let pulsePeriod: TimeInterval = 1.1
+    /// 8 FPS: okres 1,1 s tego nie boli, a 10 Hz z nowym NSImage palił 17% CPU.
+    public static let pulseFrameInterval: TimeInterval = 0.125
+
+    public static func pulsePhase(at date: Date, period: TimeInterval = pulsePeriod) -> Double {
+        guard period > 0 else { return 0 }
+        let rem = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period)
+        return (rem < 0 ? rem + period : rem) / period
+    }
+
     public static func color(for state: AggregateState) -> NSColor {
         switch state {
         case .ready: return Theme.ready

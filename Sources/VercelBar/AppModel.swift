@@ -29,7 +29,8 @@ final class AppModel: ObservableObject {
     @Published var overall: AggregateState = .idle
     @Published var anyActive = false // z migawki; overall == .error może maskować trwający build
     @Published var lastRefreshed: Date?
-    @Published var iconAlpha: Double = 1
+    /// Puls ikony liczy widok (TimelineView 8 FPS + opacity). Model mówi tylko: tak/nie.
+    @Published var shouldPulse = false
     @Published var account: VercelUser?
     @Published var teams: [Team] = []
     @Published var hasToken = false // dla UI — widoki nie dotykają Keychaina w body
@@ -44,13 +45,13 @@ final class AppModel: ObservableObject {
     let settings = SettingsStore()
 
     /// Token trzymany w pamięci procesu: każdy odczyt pęku to potencjalny monit ACL
-    /// (macOS pyta o zgodę po każdej zmianie podpisu), a pętla odpytuje co 10–30 s.
+    /// (macOS pyta o zgodę po każdej zmianie podpisu), a pętla odpytuje co 10 s.
     /// Mniej odczytów = mniej monitów. Czyszczony przy 401, ustawiany po udanym connect().
     private var cachedToken: String?
 
     private var engine = NotificationEngine()
     private var pollTask: Task<Void, Never>?
-    private var pulseTimer: Timer?
+    private var pulseTracking = PulsePolicy.State()
     private var updateTimer: Timer?
     private var tokenAlertShown = false
     private var started = false
@@ -157,7 +158,7 @@ final class AppModel: ObservableObject {
             keychainReadFailures = 0
             phase = .onboarding
             hasToken = false
-            updatePulse(active: false) // bez tego ikona pulsuje dalej po usunięciu tokenu
+            applyPulse(overall: .idle) // bez tego ikona pulsuje dalej po usunięciu tokenu
             return
         case .unavailable:
             // Chwilowa niedostępność pęku (np. ACL po aktualizacji podpisu) nie zrywa sesji;
@@ -165,7 +166,7 @@ final class AppModel: ObservableObject {
             keychainReadFailures += 1
             if keychainReadFailures >= 3 {
                 phase = .tokenInvalid
-                updatePulse(active: false)
+                applyPulse(overall: .idle)
             }
             return
         }
@@ -183,7 +184,7 @@ final class AppModel: ObservableObject {
             }
             lastRefreshed = Date()
             consecutiveFailures = 0
-            updatePulse(active: snapshot.overall == .building)
+            applyPulse(overall: snapshot.overall, projects: snapshot.projects)
 
             for event in engine.ingest(projects: snapshot.projects) {
                 let wanted: Bool
@@ -198,7 +199,7 @@ final class AppModel: ObservableObject {
             phase = .tokenInvalid
             cachedToken = nil // następny cykl przeczyta świeży token z pęku
             consecutiveFailures += 1 // bez sensu młócić 401 co 30 s; connect() zeruje licznik
-            updatePulse(active: false)
+            applyPulse(overall: .idle)
             if !tokenAlertShown {
                 tokenAlertShown = true
                 NotificationPresenter.shared.showTokenInvalid()
@@ -206,7 +207,7 @@ final class AppModel: ObservableObject {
         } catch VercelAPIError.offline {
             phase = .offline
             anyActive = false // stara migawka nie może trzymać pętli na 10 s bez sieci
-            updatePulse(active: false)
+            applyPulse(overall: .idle)
         } catch is CancellationError {
             // Anulowany polling (restart pętli) — nie zmieniaj stanu.
         } catch {
@@ -322,7 +323,6 @@ final class AppModel: ObservableObject {
 
     deinit {
         updateTimer?.invalidate()
-        pulseTimer?.invalidate()
     }
 
     /// Zwraca, czy czeka nowsza wersja — Ustawienia pokazują na tej podstawie „Masz najnowszą wersję".
@@ -368,20 +368,16 @@ final class AppModel: ObservableObject {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
-    private func updatePulse(active: Bool) {
-        if active && !reduceMotion {
-            guard pulseTimer == nil else { return }
-            let start = Date()
-            pulseTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                Task { @MainActor in
-                    let phase = (Date().timeIntervalSince(start)).truncatingRemainder(dividingBy: 1.1) / 1.1
-                    self?.iconAlpha = StatusIconRenderer.pulseAlpha(phase: phase)
-                }
-            }
-        } else {
-            pulseTimer?.invalidate()
-            pulseTimer = nil
-            iconAlpha = 1
-        }
+    /// Widok sam liczy klatki. Tu tylko bramka: buduje się, nie Reduce Motion, nie wisimy 45 min.
+    private func applyPulse(overall: AggregateState, projects: [Project] = []) {
+        let decision = PulsePolicy.evaluate(
+            overall: overall,
+            buildingDeployIDs: PulsePolicy.activeDeployIDs(in: projects),
+            previous: pulseTracking,
+            now: Date(),
+            reduceMotion: reduceMotion
+        )
+        pulseTracking = decision.state
+        shouldPulse = decision.shouldPulse
     }
 }

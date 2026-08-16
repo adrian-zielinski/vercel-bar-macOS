@@ -9,7 +9,7 @@ struct PopoverView: View {
     @State private var pulse = false
     @Environment(\.l10n) private var l10n
 
-    /// Puls kropki nagłówka żyje lokalnie — `model.iconAlpha` zostaje wyłącznie dla ikony w pasku menu.
+    /// Puls kropki nagłówka żyje lokalnie — ikona paska ma własny TimelineView.
     private var pulsing: Bool { model.iconState == .building && !reduceMotion }
 
     var body: some View {

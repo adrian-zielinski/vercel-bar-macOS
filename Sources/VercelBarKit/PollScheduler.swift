@@ -2,9 +2,12 @@ import Foundation
 
 /// Dobór interwału odpytywania API.
 public enum PollScheduler {
-    /// 30 s w spoczynku, 10 s gdy jakikolwiek obserwowany deploy jest aktywny.
+    /// 10 s zawsze: start 🚀 ma dojść w jednym cyklu, a po tanim pulsie
+    /// różnica 10 vs 30 s nie broni baterii. `anyActive` zostaje w sygnaturze,
+    /// backoff i tak nadpisuje bazę przy 429/5xx.
     public static func interval(anyActive: Bool) -> TimeInterval {
-        anyActive ? 10 : 30
+        _ = anyActive
+        return 10
     }
 
     /// Opóźnienie kolejnego odpytania z wykładniczym backoffem po 429/5xx:

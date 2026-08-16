@@ -143,6 +143,52 @@ if let d = firstDeployment(#"{"deployments":[{"uid":"d","state":"READY","created
     t.equal(d.duration, 30, "bez buildingAt duration liczone od createdAt")
 }
 
+t.suite("Duration — BUILDING z polem ready z API nie udaje skończonego builda")
+// Vercel często wysyła `ready` już w QUEUED/BUILDING (0 albo kopia createdAt).
+// Stary kod liczył duration = 0 s i wyłączał TimelineView — stoper stał na 0s.
+if let d = firstDeployment(#"{"deployments":[{"uid":"b","state":"BUILDING","createdAt":1754470000000,"buildingAt":1754470000000,"ready":1754470000000}]}"#,
+                           "BUILDING z ready = createdAt") {
+    t.equal(d.duration, nil, "trwający build nie ma skończonego duration")
+    t.equal(d.elapsed(at: Date(timeIntervalSince1970: 1_754_470_038)), 38,
+            "stoper liczy od startu, nie od ready")
+}
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"q","state":"QUEUED","createdAt":1754470000000,"ready":0}]}"#,
+                           "QUEUED z ready: 0") {
+    t.equal(d.readyAt, nil, "ready = 0 to brak daty, nie 1970")
+    t.equal(d.duration, nil, "zerowy ready nie daje duration")
+    t.equal(d.elapsed(at: Date(timeIntervalSince1970: 1_754_470_012)), 12,
+            "kolejka tyka od createdAt")
+}
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"z","state":"READY","createdAt":1754470000000,"ready":0}]}"#,
+                           "READY z ready: 0") {
+    t.equal(d.readyAt, nil, "ready = 0 przy READY też jest pusty")
+    t.equal(d.duration, nil, "bez sensownego ready nie ma duration")
+}
+
+if let d = firstDeployment(#"{"deployments":[{"uid":"n","state":"READY","createdAt":1754470030000,"ready":1754470000000}]}"#,
+                           "READY z ready przed createdAt") {
+    t.equal(d.duration, nil, "ujemny czas budowania zostaje nil, nie 0 s")
+}
+
+t.suite("DeploymentSummary.elapsed")
+let building = DeploymentSummary(id: "live", state: .building,
+                                 createdAt: Date(timeIntervalSince1970: 1000),
+                                 buildingAt: Date(timeIntervalSince1970: 1005))
+t.equal(building.duration, nil, "BUILDING bez ready → duration nil")
+t.equal(building.elapsed(at: Date(timeIntervalSince1970: 1043)), 38,
+        "elapsed od buildingAt")
+t.equal(building.elapsed(at: Date(timeIntervalSince1970: 1000)), 0,
+        "czas sprzed buildingAt nie idzie w minus")
+
+let finished = DeploymentSummary(id: "finished", state: .ready,
+                                 createdAt: Date(timeIntervalSince1970: 1000),
+                                 buildingAt: Date(timeIntervalSince1970: 1002),
+                                 readyAt: Date(timeIntervalSince1970: 1040))
+t.equal(finished.elapsed(at: Date(timeIntervalSince1970: 9999)), 38,
+        "zakończony deploy ma stałe elapsed = duration")
+
 if let d = firstDeployment(#"{"deployments":[{"uid":"u","url":"https://x.vercel.app"}]}"#, "url ze schematem") {
     t.equal(d.previewURL?.absoluteString, "https://x.vercel.app", "gotowy schemat nie jest doklejany drugi raz")
 }
@@ -239,7 +285,7 @@ t.equal(StatusAggregator.headline(for: [], lang: .en), "No watched projects", "n
 t.equal(StatusAggregator.headline(for: [.canceled, .unknown], lang: .en), "No active deploys", "canceled + unknown → brak aktywnych")
 
 t.suite("PollScheduler")
-t.equal(PollScheduler.interval(anyActive: false), 30, "spokój → 30 s")
+t.equal(PollScheduler.interval(anyActive: false), 10, "spokój → 10 s (szybszy start 🚀)")
 t.equal(PollScheduler.interval(anyActive: true), 10, "build w toku → 10 s")
 
 t.suite("PollScheduler.delay — backoff")
@@ -1550,6 +1596,58 @@ t.suite("StatusIconRenderer")
 t.equal(StatusIconRenderer.pulseAlpha(phase: 0), 0.55, "puls w fazie 0 → 0,55")
 t.equal(StatusIconRenderer.pulseAlpha(phase: 0.5), 1.0, "puls w fazie 0,5 → 1,0")
 t.check(abs(StatusIconRenderer.pulseAlpha(phase: 1.0) - 0.55) < 0.0001, "puls w fazie 1,0 wraca do 0,55")
+let phaseOrigin = Date(timeIntervalSinceReferenceDate: 0)
+t.equal(StatusIconRenderer.pulsePhase(at: phaseOrigin), 0, "faza w zerze odniesienia → 0")
+t.equal(StatusIconRenderer.pulsePhase(at: Date(timeIntervalSinceReferenceDate: 0.55)), 0.5,
+        "pół okresu (1,1 s) → faza 0,5")
+t.check(abs(StatusIconRenderer.pulsePhase(at: Date(timeIntervalSinceReferenceDate: 1.1))) < 0.0001,
+        "pełny okres wraca do fazy 0")
+t.equal(StatusIconRenderer.pulsePeriod, 1.1, "okres pulsu 1,1 s")
+t.equal(StatusIconRenderer.pulseFrameInterval, 0.125, "8 FPS")
+
+t.suite("PulsePolicy")
+let t0 = Date(timeIntervalSince1970: 1_754_470_000)
+let buildIDs: Set<String> = ["dpl_1"]
+let idle = PulsePolicy.evaluate(overall: .ready, buildingDeployIDs: [], previous: .init(),
+                                now: t0, reduceMotion: false)
+t.equal(idle.shouldPulse, false, "brak builda → bez pulsu")
+t.equal(idle.state, PulsePolicy.State(), "spoczynek czyści śledzenie")
+
+let start = PulsePolicy.evaluate(overall: .building, buildingDeployIDs: buildIDs, previous: .init(),
+                                 now: t0, reduceMotion: false)
+t.equal(start.shouldPulse, true, "nowy build pulsuje")
+t.equal(start.state.deployIDs, buildIDs, "śledzi id aktywnych deployów")
+t.equal(start.state.startedAt, t0, "zeruje stoper pulsu")
+
+let still = PulsePolicy.evaluate(overall: .building, buildingDeployIDs: buildIDs, previous: start.state,
+                                 now: t0.addingTimeInterval(20 * 60), reduceMotion: false)
+t.equal(still.shouldPulse, true, "ten sam build po 20 min nadal pulsuje")
+t.equal(still.state.startedAt, t0, "stoper pulsu nie restartuje się przy tym samym id")
+
+let capped = PulsePolicy.evaluate(overall: .building, buildingDeployIDs: buildIDs, previous: start.state,
+                                  now: t0.addingTimeInterval(PulsePolicy.maxContinuous),
+                                  reduceMotion: false)
+t.equal(capped.shouldPulse, false, "ten sam build po 45 min przestaje pulsować")
+t.equal(capped.state.deployIDs, buildIDs, "śledzenie zostaje, żeby nie odpalić pulsu od nowa")
+
+let reduced = PulsePolicy.evaluate(overall: .building, buildingDeployIDs: buildIDs, previous: .init(),
+                                   now: t0, reduceMotion: true)
+t.equal(reduced.shouldPulse, false, "Reduce Motion → bez pulsu")
+
+let errored = PulsePolicy.evaluate(overall: .error, buildingDeployIDs: buildIDs, previous: start.state,
+                                   now: t0.addingTimeInterval(5), reduceMotion: false)
+t.equal(errored.shouldPulse, false, "ERROR ma pierwszeństwo — ikona nie pulsuje")
+t.equal(errored.state, PulsePolicy.State(), "błąd czyści śledzenie")
+
+let nextBuild = PulsePolicy.evaluate(overall: .building, buildingDeployIDs: ["dpl_2"],
+                                     previous: start.state,
+                                     now: t0.addingTimeInterval(46 * 60), reduceMotion: false)
+t.equal(nextBuild.shouldPulse, true, "nowe id po limicie znowu pulsuje")
+t.equal(nextBuild.state.deployIDs, ["dpl_2"], "śledzi nowy deploy")
+
+let pA = Project(id: "p1", name: "a", latest: summary(id: "d1", state: .building))
+let pB = Project(id: "p2", name: "b", latest: summary(id: "d2", state: .ready))
+t.equal(PulsePolicy.activeDeployIDs(in: [pA, pB]), ["d1"], "tylko aktywne latest wchodzą do pulsu")
 let icon = StatusIconRenderer.image(state: .ready)
 t.equal(icon.size, NSSize(width: 15, height: 13), "rozmiar ikony 15×13 pt (design)")
 t.check(!icon.isTemplate, "ikona kolorowa, nie szablonowa")
