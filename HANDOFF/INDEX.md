@@ -2,4 +2,4 @@
 
 | Temat | Status | Ostatnia aktualizacja | Opis |
 |---|---|---|---|
-| [vercelbar-projekt](vercelbar-projekt.md) | aktywny | 2026-08-07 | Aplikacja paska menu macOS do monitorowania deployów Vercela — od projektu po wydanie 1.2.2 na GitHubie z automatyczną aktualizacją. |
+| [vercelbar-projekt](vercelbar-projekt.md) | in-progress | 2026-08-17 | Apka paska: deploye Vercela, podpis, update, wydajność pulsu/pollingu. Kod 1.2.3-do-wydania na `main`; produkcja nadal v1.2.2. NIE dotyczy innych projektów Vercel/dashboard. |
