@@ -13,7 +13,7 @@ updated: 2026-08-17
 
 Natywna aplikacja Swift/SwiftUI paska menu macOS pokazująca na żywo stan deployów Vercela: kolorowy trójkąt w pasku (zielony = wdrożone, pulsujący niebieski = build w toku, czerwony = padł, szary = idle/offline), popover z listą ostatnich deployów (feed 3/5/10 pozycji, każdy obserwowany projekt ma gwarantowany wiersz), powiadomienia z dźwiękiem (start 🚀 / sukces ✅ / błąd ❌), okno ustawień (token w Keychain, wybór projektów i zespołu, przełącznik języka pl/en, start przy logowaniu), silnik samoaktualizacji z GitHub Releases.
 
-Zero zależności zewnętrznych, ~488 KB paczka, 459 testów w wykonywalnym runnerze (`swift run vercelbar-tests` — nie XCTest, bo build jest CLT-only bez Xcode).
+Zero zależności zewnętrznych, ~492 KB paczka, 463 testy w wykonywalnym runnerze (`swift run vercelbar-tests` — nie XCTest, bo build jest CLT-only bez Xcode).
 
 ## Repozytorium
 
@@ -24,10 +24,11 @@ Zero zależności zewnętrznych, ~488 KB paczka, 459 testów w wykonywalnym runn
 
 ## Aktualny stan
 
-- ✅ Kod wydajności i stopera na `main`: commit `384b53f` (https://github.com/adrian-zielinski/vercel-bar-macOS/commit/384b53f)
-- 🔄 Wydanie **1.2.3 nie istnieje**. Homebrew, `install.sh` i silnik aktualizacji serwują nadal **v1.2.2**. `/Applications/VercelBar.app` to 1.2.2.
-- ✅ Lokalny build z tej sesji: `build/VercelBar.app` (podpis „VercelBar Local Signing"), odpalony zamiast kopii z Applications. Wersja w `Scripts/build-app.sh` wciąż `1.2.2`.
-- ⛔ Czeka na „wdrażaj": bump do 1.2.3, `./Scripts/build-app.sh`, tag + GitHub Release (`VercelBar.zip`), drugi commit z SHA w `Casks/vercelbar.rb` (wzorzec 1.2.1/1.2.2).
+- ✅ Na `main` leży tylko audyt CPU/stopera: `384b53f`. **Poprawki live-UI z 17.08 są w working tree, nie w gicie** (`AppModel`, `PopoverView`, `ProjectRowView`, `VercelBarApp`, `Models`, testy).
+- 🔄 Wydanie **1.2.3 nie istnieje**. Homebrew, `install.sh` i silnik aktualizacji serwują **v1.2.2**. `/Applications/VercelBar.app` to 1.2.2.
+- ✅ Lokalny build z poprawkami: `build/VercelBar.app` (podpis „VercelBar Local Signing"), proces odpalony z tej ścieżki. W `Scripts/build-app.sh` VERSION nadal `1.2.2`.
+- ⚠️ W `build/` wiszą stare kopie `VercelBar 2.app` / `3.app` / `4.app`. User siedział na `VercelBar 2.app` i widział zepsuty stoper — nie odpalać ich.
+- ⛔ Czeka na potwierdzenie na żywo (deploy przy otwartym popoverze), potem commit źródeł, potem „wdrażaj": bump do 1.2.3 + tag + Release + SHA w casku.
 
 Aktualne wydanie produkcyjne: **v1.2.2** (https://github.com/adrian-zielinski/vercel-bar-macOS/releases/tag/v1.2.2).
 
@@ -67,9 +68,9 @@ Kopia zapasowa certyfikatu: `~/.vercelbar-signing/vercelbar-signing.p12` (hasło
 ## Architektura (dla przyszłych zmian)
 
 - `Sources/VercelBarKit/` — czysta logika, TDD, zero UI: modele, `VercelAPI` (klient REST), `RefreshCore` (agregacja migawki), `NotificationEngine` (zdarzenia z przejść stanów), `SettingsStore`/`KeychainStore`, `L10n` (pl+en), `UpdateChecker`/`UpdateInstallEngine`
-- `Sources/VercelBar/` — SwiftUI: `AppModel` (@MainActor, polling **zawsze 10 s** + backoff 429/5xx), `StatusIconLabel` (puls 8 FPS przez `opacity` na jednej NSImage), `PopoverView`/`ProjectRowView`, `SettingsView`, `NotificationPresenter`, `UpdateInstaller`
+- `Sources/VercelBar/` — SwiftUI: `AppModel` (@MainActor, polling **Timer na RunLoop.common co 10 s** + backoff 429/5xx + `beginActivity`, start z `init` nie z onAppear), `StatusIconLabel` (puls 8 FPS, TimelineView tylko w etykiecie paska), `PopoverView` (`SecondClock` 1 Hz), `ProjectRowView` (stoper + pasek CA), `SettingsView`, `NotificationPresenter`, `UpdateInstaller`
 - `Sources/VercelBarKit/PulsePolicy.swift` — czy ikona ma pulsować (Reduce Motion, ERROR > BUILDING, ten sam zestaw deployów max 45 min)
-- `DeploymentSummary.elapsed(at:)` — stoper na żywo; `duration` tylko dla skończonego deployu
+- `DeploymentSummary.elapsed(at:)` — żywy stoper **od `createdAt`**; `buildingAt` tylko gdy `createdAt` brak; `duration` tylko dla skończonego deployu (`readyAt − buildingAt`)
 - `Sources/vercelbar-tests/` — wykonywalny runner testów (nie XCTest)
 - `Scripts/build-app.sh` — buduje `.app`, podpisuje, pakuje zip; `Scripts/make-dmg.sh` — DMG z zipa
 - Proces developerski w tej sesji: subagenci Opus 5 przez `Agent`/`SendMessage`, każda zmiana z dwustopniowym przeglądem (spec compliance + jakość, często z testami mutacyjnymi), poprawki wracają do tego samego wykonawcy, kontroler (główna sesja) commituje i wydaje
@@ -80,13 +81,20 @@ Kopia zapasowa certyfikatu: `~/.vercelbar-signing/vercelbar-signing.p12` (hasło
 - 17% CPU / 2 h 43 min czasu CPU: timer pulsu 10 Hz bez `tolerance` + nowy `NSImage`+BezierPath + `@Published iconAlpha` + hop `Task { @MainActor }` na tick. Idle bez utkniętego BUILDING nie ma prawa tyle żreć.
 - Puls: jedna NSImage na stan, `TimelineView(.periodic(by: 0.125))` + `Image.opacity`. Nie ruszamy ręcznego `NSStatusItem` (MenuBarExtra nie oddaje buttona; migracja rozjechałaby powiadomienia i update).
 - Ten sam zestaw id BUILDING > 45 min: ikona zostaje niebieska, puls gaśnie. Nowe id znowu pulsuje. ERROR + BUILDING: ikona czerwona, bez pulsu, polling 10 s zostaje.
-- Vercel w QUEUED/BUILDING często wysyła `ready: 0` albo `ready == createdAt`. Stary kod liczył `duration = 0 s` i wyłączał TimelineView. `date(fromMs:)` odrzuca `<= 0`; `duration` tylko gdy `!state.isActive`.
+- Vercel w QUEUED/BUILDING często wysyła `ready: 0` albo `ready == createdAt`. `date(fromMs:)` odrzuca `<= 0`; `duration` tylko gdy `!state.isActive`.
+- **`buildingAt` w QUEUED/BUILDING bywa chwilą odpytania albo datą przyszłą.** Stoper od `buildingAt` skakał do 0 s po każdym pollu (zrzut: „74 s temu" + „0 s"). Żywy czas liczymy od `createdAt`.
+- `TimelineView` w oknie MenuBarExtra (`.window`) **nie tyka**. Stoper i wymuszenie przerysowania listy: `SecondClock` (Timer 1 Hz, `.common`). TimelineView zostaje wyłącznie w etykiecie ikony.
+- `Task.sleep` w pętli pollingu usypiał App Nap przy zamkniętym popoverze — nowe buildy widać było dopiero po „Odśwież". Teraz: `Timer` na `.common`, `pollGeneration` (żeby `restartPolling` nie dublował łańcucha), `ProcessInfo.beginActivity(.userInitiatedAllowingIdleSystemSleep)`, `start()` z `AppModel.init`.
+- `withAnimation` na całej liście feedu + SwiftUI `.repeatForever` na `offset` paska = zacinający się niebieski pasek. Feed bez implicit animation; pasek to `NSView` + `CABasicAnimation`.
+- Wiersz aktywny: sam tykający stoper. Wiersz skończony: „12 min temu" + ile trwał build.
 - `anyActive` w kodzie nie utyka; utknie, gdy API trzyma deploy w BUILDING. Stąd limit 45 min na puls.
-- Push na `main` ≠ wydanie. User napisał „puszyj wszystko" (źródło na GitHub), nie „wdrażaj". Cask i update checker zostają na 1.2.2 do osobnego release.
+- Push na `main` ≠ wydanie. Cask i update checker zostają na 1.2.2 do osobnego release.
 
 ## Następny krok
 
-Po „wdrażaj": bump `VERSION` w `Scripts/build-app.sh` do **1.2.3**, `./Scripts/build-app.sh`, tag `v1.2.3` + GitHub Release z `build/VercelBar.zip`, potem commit SHA w `Casks/vercelbar.rb` (osobny commit, jak przy 1.2.1/1.2.2). Potem zmierzyć w Monitorze aktywności 15 min idle i jeden trwający build.
+1. User puszcza deploy przy otwartym popoverze: stoper tyka co 1 s, pasek jedzie równo, nowy wiersz wchodzi sam (~10 s).
+2. Commit źródeł (6 plików powyżej) — to nie jest „wdrażaj", tylko lokalny git.
+3. Po „wdrażaj": bump `VERSION` w `Scripts/build-app.sh` do **1.2.3** (ten commit musi zawierać live-UI), `./Scripts/build-app.sh`, tag `v1.2.3` + GitHub Release z `build/VercelBar.zip`, SHA w `Casks/vercelbar.rb` (osobny commit). Potem 15 min idle w Monitorze aktywności.
 
 ## Czego NIE robić
 
@@ -97,19 +105,25 @@ Po „wdrażaj": bump `VERSION` w `Scripts/build-app.sh` do **1.2.3**, `./Script
 - Nie publikować release / nie zmieniać caska bez „wdrażaj".
 - Nie wracać do timera 10 Hz z nowym NSImage na tick.
 - Nie traktować pola `ready` z API jako końca builda, gdy stan jest aktywny.
+- Nie liczyć żywego stopera od `buildingAt`.
+- Nie używać `TimelineView` do sekund w popoverze MenuBarExtra.
+- Nie owijać podstawienia `feed` w `withAnimation`.
+- Nie wracać do SwiftUI `.repeatForever` na `offset` paska BUILDING.
+- Nie odpalać `build/VercelBar 2.app` (ani 3/4) — to stare binarki.
 
 ## Artefakty
 
 - `Sources/VercelBarKit/PulsePolicy.swift` — bramka pulsu
-- `Sources/VercelBar/VercelBarApp.swift` — `StatusIconLabel`
-- `Sources/VercelBar/AppModel.swift` — `shouldPulse`, bez `pulseTimer`
-- `Sources/VercelBar/ProjectRowView.swift` — stoper przez `elapsed(at:)`
-- `Sources/VercelBarKit/Models.swift`, `APIDecoding.swift`, `PollScheduler.swift`, `StatusIconRenderer.swift`
-- `Sources/vercelbar-tests/main.swift` — 459 testów
+- `Sources/VercelBar/VercelBarApp.swift` — `StatusIconLabel`; etykieta czyta `lastRefreshed`
+- `Sources/VercelBar/AppModel.swift` — Timer pollingu, `pollGeneration`, `beginActivity`; bez `withAnimation` na feed
+- `Sources/VercelBar/PopoverView.swift` — `SecondClock`
+- `Sources/VercelBar/ProjectRowView.swift` — jeden stoper na aktywnym wierszu; pasek CA
+- `Sources/VercelBarKit/Models.swift` — `elapsed` od `createdAt`; `liveStart(at:)`
+- `Sources/vercelbar-tests/main.swift` — 463 testy
 - `Scripts/build-app.sh` — VERSION nadal 1.2.2
 - `Casks/vercelbar.rb` — cask 1.2.2
-- `build/VercelBar.app` — lokalny build z tej sesji (nie w gicie)
-- Commit: `384b53f` na `main`
+- `build/VercelBar.app` — lokalny build z poprawkami (nie w gicie)
+- Na `main`: `384b53f` (kod) + `12b8093` (poprzedni handoff). Live-UI **niezacommitowane**.
 
 ## Do zrobienia / warto rozważyć
 
@@ -121,5 +135,6 @@ Po „wdrażaj": bump `VERSION` w `Scripts/build-app.sh` do **1.2.3**, `./Script
 
 ## Dziennik sesji
 
-- **2026-08-17** — Audyt CPU/baterii: puls z 10 Hz + alokacji NSImage na opacity 8 FPS, polling 10 s, limit pulsu 45 min, stoper builda (ready: 0 nie daje już 0 s). Testy 459. Kod na `main` (`384b53f`). Release 1.2.3 i Homebrew nie ruszone — czeka na „wdrażaj".
+- **2026-08-17 (wieczór)** — Live-UI: stoper od `createdAt` (buildingAt zerował do 0 s), `SecondClock` zamiast TimelineView w popoverze, polling Timer+App Nap, pasek na Core Animation, jeden czas na aktywnym wierszu. Testy 463. Build lokalny odpalony. Źródła **niezacommitowane**. 1.2.3 czeka na „wdrażaj".
+- **2026-08-17** — Audyt CPU/baterii: puls 8 FPS, polling 10 s, limit pulsu 45 min, `ready: 0` nie daje duration. Kod na `main` (`384b53f`).
 - **2026-08-06/07** — Projekt od zera do **1.2.2**: UI, feed, L10n, Homebrew/curl/DMG, silnik aktualizacji, naprawa powiadomień (ad-hoc podpis blokował `UNUserNotificationCenter`).
